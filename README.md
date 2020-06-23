@@ -34,11 +34,14 @@ Batch conversion is possible with the included shell script `batch_convert.sh`
    change this with the (`--shock-action` option)
  * Freezes do not work (I do not know how to get the start time yet) and
    therefore are disabled in code (`ddr::ssq::FREEZE`)
+ * Known problems listed for unxwb (for wave banks without entry names having
+   2 entries, which often are preview and full song, the longest one is used by
+   default).
 
 ### unxwb
 
-This can list and extract sounds from XWB wave banks. It currently only
-supports [ADPCM][ADPCM] sounds.
+This can list and extract sounds from XWB wave banks.
+
 Basic Usage:
 
     brd unxwb file.xwb
@@ -46,8 +49,12 @@ Basic Usage:
 
 #### Known Problems
 
-If you want to extract sounds that are stored in other formats, you can use
-[Luigi Auriemma’s unxwb][unxwb] (<kbd>Ctrl</kbd>+<kbd>F</kbd> unxwb).
+ * It only supports sounds in [ADPCM][ADPCM] format. If you want to extract
+   sounds that are stored in other formats, you can use [Luigi Auriemma’s
+   unxwb][unxwb] (<kbd>Ctrl</kbd>+<kbd>F</kbd> unxwb).
+ * For wave banks without name entries it does not yet offer the option to read
+   the names from [XSB files][multimedia.cx-XSB] and currently generates the
+   names from the index in the file (starting from 0).
 
 ## About this project
 
@@ -77,6 +84,7 @@ This project is not affiliated with ppy or Konami.
 [SaxxonPike]: https://github.com/SaxxonPike
 [aluigi]: http://aluigi.altervista.org/
 [ddr]: https://en.wikipedia.org/wiki/Dance_Dance_Revolution
+[multimedia.cx-XSB]: https://wiki.multimedia.cx/index.php/XACT#Sound_Banks_.28.xsb.29
 [osu!mania]: https://osu.ppy.sh/help/wiki/Game_Modes/osu%21mania
 [osu-doc]: https://osu.ppy.sh/help/wiki/osu!_File_Formats/Osu_(file_format)
 [scharfrichter-ssq]: https://github.com/SaxxonPike/scharfrichter/blob/master/Scharfrichter/Archives/BemaniSSQ.cs
