@@ -199,7 +199,7 @@ impl WaveBank<'_> {
         let entry_names = if segments[3].len() == info.entry_count as usize * 64 {
             exec_nom_parser(count(take_str64, info.entry_count as usize), segments[3])?
         } else {
-            warn!("File does not have name entries");
+            warn!("Wave bank does not have name entries");
             (0..info.entry_count).map(|x| x.to_string()).collect()
         };
 
@@ -216,6 +216,7 @@ impl WaveBank<'_> {
                 Sound {
                     format: entry.format.clone(),
                     data: &segments[4][start..end],
+                    size: end - start,
                 },
             );
         }
@@ -230,6 +231,7 @@ impl WaveBank<'_> {
 pub struct Sound<'a> {
     format: Format,
     data: &'a [u8],
+    pub size: usize,
 }
 
 impl Sound<'_> {

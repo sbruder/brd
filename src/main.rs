@@ -9,7 +9,7 @@ use log::{debug, error, info, warn};
 use brd::converter;
 use brd::ddr::ssq::SSQ;
 use brd::osu;
-use brd::xact3::xwb::WaveBank;
+use brd::xact3::xwb::{Sound as XWBSound, WaveBank};
 
 #[derive(Clap)]
 #[clap()]
@@ -161,15 +161,17 @@ fn main() -> Result<()> {
 
             let audio_data = if wave_bank.sounds.contains_key(sound_name) {
                 wave_bank.sounds.get(sound_name).unwrap().to_wav()?
-            } else if wave_bank.sounds.contains_key("1") {
+            } else if wave_bank.sounds.len() == 2 {
                 warn!(
-                    "Sound {} not found in wave bank, using second entry",
+                    "Sound {} not found in wave bank, but it has two entries; assuming these are preview and full song",
                     sound_name
                 );
-                wave_bank.sounds.get("1").unwrap().to_wav()?
+                let mut sounds = wave_bank.sounds.values().collect::<Vec<&XWBSound>>();
+                sounds.sort_unstable_by(|a, b| b.size.cmp(&a.size));
+                sounds[0].to_wav()?
             } else {
                 return error(format!(
-                    "Could not find sound with chart name {} or second numbered entry in wave bank",
+                    "Could not find matching sound in wave bank (searched for {})",
                     sound_name,
                 ));
             };
