@@ -196,8 +196,12 @@ impl WaveBank<'_> {
         debug!("Parsing entries (length {})", segments[1].len());
         let entries = exec_nom_parser(count(Entry::parse, info.entry_count as usize), segments[1])?;
         debug!("Parsing entry names (length {})", segments[3].len());
-        let entry_names =
-            exec_nom_parser(count(take_str64, info.entry_count as usize), segments[3])?;
+        let entry_names = if segments[3].len() == info.entry_count as usize * 64 {
+            exec_nom_parser(count(take_str64, info.entry_count as usize), segments[3])?
+        } else {
+            warn!("File does not have name entries");
+            (0..info.entry_count).map(|x| x.to_string()).collect()
+        };
 
         let mut wave_bank = WaveBank {
             name: info.name,
