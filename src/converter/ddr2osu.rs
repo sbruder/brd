@@ -40,13 +40,6 @@ pub struct Config {
     #[clap(skip = "audio.wav")]
     pub audio_filename: String,
     #[clap(
-        long,
-        default_value = "180",
-        about = "Offset in milliseconds",
-        display_order = 5
-    )]
-    pub offset: i32,
-    #[clap(
         long = "no-stops",
         about = "Disable stops",
         parse(from_flag = std::ops::Not::not),
@@ -96,9 +89,8 @@ impl fmt::Display for Config {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "ddr2osu (+{}ms{} shock→{:?} hp{} acc{})",
-            self.offset,
-            if self.stops { " stops" } else { "" },
+            "ddr2osu ({}shock→{:?} hp{} acc{})",
+            if self.stops { "stops " } else { "" },
             self.shock_action,
             self.hp_drain,
             self.accuracy
@@ -348,20 +340,6 @@ impl ssq::SSQ {
         debug!("Configuration: {:?}", config);
 
         let mut timing_points = Vec::new();
-
-        timing_points.push(beatmap::TimingPoint {
-            time: 0,
-            beat_length: config.offset as f32,
-            meter: 4,
-            sample_set: beatmap::SampleSet::BeatmapDefault,
-            sample_index: 0,
-            volume: 0,
-            uninherited: true,
-            effects: beatmap::TimingPointEffects {
-                kiai_time: false,
-                omit_first_barline: false,
-            },
-        });
 
         for entry in &self.tempo_changes.0 {
             if config.stops || entry.beat_length != f32::INFINITY {
