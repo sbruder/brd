@@ -191,11 +191,11 @@ impl WaveBank<'_> {
             .map(|x| x.get_from(data))
             .collect();
 
-        debug!("Parsing info");
+        debug!("Parsing info (length {})", segments[0].len());
         let info = exec_nom_parser(Info::parse, segments[0])?;
-        debug!("Parsing entries");
+        debug!("Parsing entries (length {})", segments[1].len());
         let entries = exec_nom_parser(count(Entry::parse, info.entry_count as usize), segments[1])?;
-        debug!("Parsing entry names");
+        debug!("Parsing entry names (length {})", segments[3].len());
         let entry_names =
             exec_nom_parser(count(take_str64, info.entry_count as usize), segments[3])?;
 
