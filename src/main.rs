@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
 use clap::Clap;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 
 use brd::converter;
 use brd::ddr::ssq::SSQ;
@@ -161,9 +161,15 @@ fn main() -> Result<()> {
 
             let audio_data = if wave_bank.sounds.contains_key(sound_name) {
                 wave_bank.sounds.get(sound_name).unwrap().to_wav()?
+            } else if wave_bank.sounds.contains_key("1") {
+                warn!(
+                    "Sound {} not found in wave bank, using second entry",
+                    sound_name
+                );
+                wave_bank.sounds.get("1").unwrap().to_wav()?
             } else {
                 return error(format!(
-                    "Could not find sound with chart name {} in wave bank",
+                    "Could not find sound with chart name {} or second numbered entry in wave bank",
                     sound_name,
                 ));
             };
