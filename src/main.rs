@@ -102,23 +102,22 @@ fn main() -> Result<()> {
             let wave_bank = WaveBank::parse(&xwb_data)?;
             info!("Opened wave bank “{}” from {:?}", wave_bank.name, opts.file);
 
-            match opts.single_entry {
-                Some(name) => {
-                    let sound = match wave_bank.sounds.get(&name) {
-                        Some(sound) => sound,
-                        None => return error(format!("Entry {} not found in wave bank", name)),
-                    };
-                    fs::write(format!("{}.wav", name), &sound.to_wav()?)?;
-                }
-                None => {
-                    for (name, sound) in wave_bank.sounds {
-                        if opts.list_entries {
-                            println!("{}", name);
-                            continue;
-                        }
-                        info!("Extracting {}", name);
-                        fs::write(format!("{}.wav", name), &sound.to_wav()?)?;
+            let entries = match opts.single_entry {
+                Some(name) => match wave_bank.sounds.get(&name) {
+                    Some(_) => vec![name],
+                    None => return error(format!("Entry {} not found in wave bank", name)),
+                },
+                None => wave_bank.sounds.keys().cloned().collect(),
+            };
+
+            for (name, sound) in wave_bank.sounds {
+                if entries.contains(&name) {
+                    if opts.list_entries {
+                        println!("{}", name);
+                        continue;
                     }
+                    info!("Extracting {}", name);
+                    fs::write(format!("{}.wav", name), &sound.to_wav()?)?;
                 }
             }
         }
