@@ -1,5 +1,4 @@
-use std::fs::File;
-use std::io::prelude::*;
+use std::fs;
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
@@ -85,13 +84,6 @@ fn error(message: String) -> Result<()> {
     Err(anyhow!(message))
 }
 
-fn read_file(name: &PathBuf) -> Result<Vec<u8>> {
-    let mut file = File::open(name)?;
-    let mut data = vec![];
-    file.read_to_end(&mut data)?;
-    Ok(data)
-}
-
 fn get_basename(path: &PathBuf) -> Option<&str> {
     match path.file_stem() {
         Some(stem) => stem.to_str(),
@@ -106,7 +98,7 @@ fn main() -> Result<()> {
 
     match opts.subcmd {
         SubCommand::UnXWB(opts) => {
-            let xwb_data = read_file(&opts.file)?;
+            let xwb_data = fs::read(&opts.file)?;
             let wave_bank = WaveBank::parse(&xwb_data)?;
             info!("Opened wave bank “{}” from {:?}", wave_bank.name, opts.file);
 
@@ -116,9 +108,7 @@ fn main() -> Result<()> {
                         Some(sound) => sound,
                         None => return error(format!("Entry {} not found in wave bank", name)),
                     };
-                    let out_file = format!("{}.wav", name);
-                    let mut wav_file = File::create(out_file)?;
-                    wav_file.write_all(&sound.to_wav()?)?;
+                    fs::write(format!("{}.wav", name), &sound.to_wav()?)?;
                 }
                 None => {
                     for (name, sound) in wave_bank.sounds {
@@ -127,9 +117,7 @@ fn main() -> Result<()> {
                             continue;
                         }
                         info!("Extracting {}", name);
-                        let out_file = format!("{}.wav", name);
-                        let mut wav_file = File::create(out_file)?;
-                        wav_file.write_all(&sound.to_wav()?)?;
+                        fs::write(format!("{}.wav", name), &sound.to_wav()?)?;
                     }
                 }
             }
@@ -150,13 +138,13 @@ fn main() -> Result<()> {
                 opts.ssq_file, sound_name, opts.xwb_file, opts.out_file
             );
 
-            let ssq_data = read_file(&opts.ssq_file)?;
+            let ssq_data = fs::read(&opts.ssq_file)?;
             let ssq = SSQ::parse(&ssq_data)?;
 
             let convert_config = opts.convert;
             let beatmaps = ssq.to_beatmaps(&convert_config)?;
 
-            let xwb_data = read_file(&opts.xwb_file)?;
+            let xwb_data = fs::read(&opts.xwb_file)?;
             let wave_bank = WaveBank::parse(&xwb_data)?;
 
             let audio_data = if wave_bank.sounds.contains_key(sound_name) {
