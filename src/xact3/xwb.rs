@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::convert::TryInto;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use log::{debug, info, warn};
 use nom::bytes::complete::tag;
 use nom::error::ParseError;
@@ -10,13 +10,20 @@ use nom::number::complete::{le_i32, le_u32};
 use nom::{take_str, IResult};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
+use thiserror::Error;
 
 use crate::utils;
 use crate::utils::exec_nom_parser;
 use crate::xact3::adpcm;
 
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("{0:?} is not a supported format")]
+    UnsupportedFormat(FormatTag),
+}
+
 #[derive(Clone, FromPrimitive, Debug, PartialEq)]
-enum FormatTag {
+pub enum FormatTag {
     PCM = 0,
     XMA = 1,
     ADPCM = 2,
@@ -43,11 +50,11 @@ impl From<u32> for Format {
 }
 
 impl TryInto<adpcm::WaveFormat> for Format {
-    type Error = anyhow::Error;
+    type Error = Error;
 
-    fn try_into(self) -> Result<adpcm::WaveFormat> {
+    fn try_into(self) -> Result<adpcm::WaveFormat, Error> {
         if self.tag != FormatTag::ADPCM {
-            return Err(anyhow!("Format is not ADPCM"));
+            return Err(Error::UnsupportedFormat(self.tag));
         }
 
         let n_block_align = (self.alignment as u16 + 22) * self.channels;
@@ -236,6 +243,9 @@ pub struct Sound<'a> {
 
 impl Sound<'_> {
     pub fn to_wav(&self) -> Result<Vec<u8>> {
-        adpcm::build_wav(self.format.clone().try_into()?, self.data)
+        match &self.format.tag {
+            FormatTag::ADPCM => adpcm::build_wav(self.format.clone().try_into()?, self.data),
+            _ => Err(Error::UnsupportedFormat(self.format.tag.clone()).into()),
+        }
     }
 }
