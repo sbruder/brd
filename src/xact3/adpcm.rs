@@ -1,6 +1,5 @@
 use std::io::{Cursor, Write};
 
-use anyhow::Result;
 use byteorder::{LittleEndian, WriteBytesExt};
 use log::{debug, trace};
 
@@ -88,7 +87,7 @@ impl WaveChunk for RIFFHeader {
     }
 }
 
-pub fn build_wav(format: WaveFormat, data: &[u8]) -> Result<Vec<u8>> {
+pub fn build_wav(format: WaveFormat, data: &[u8]) -> Vec<u8> {
     debug!("Building file");
     let riff_header = RIFFHeader {
         file_size: 82 + data.len() as u32,
@@ -104,15 +103,15 @@ pub fn build_wav(format: WaveFormat, data: &[u8]) -> Result<Vec<u8>> {
     let mut buf = Cursor::new(Vec::new());
 
     trace!("Building RIFF header");
-    buf.write_all(&riff_header.to_chunk())?;
+    buf.write_all(&riff_header.to_chunk()).unwrap();
     trace!("Building fmt  chunk");
-    buf.write_all(&format.to_chunk())?;
+    buf.write_all(&format.to_chunk()).unwrap();
     trace!("Building fact chunk");
-    buf.write_all(&fact.to_chunk())?;
+    buf.write_all(&fact.to_chunk()).unwrap();
 
-    write!(buf, "data")?;
+    write!(buf, "data").unwrap();
     buf.write_u32::<LittleEndian>(data.len() as u32).unwrap();
-    buf.write_all(data)?;
+    buf.write_all(data).unwrap();
 
-    Ok(buf.into_inner())
+    buf.into_inner()
 }

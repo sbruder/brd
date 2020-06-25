@@ -244,7 +244,7 @@ pub struct Sound<'a> {
 impl Sound<'_> {
     pub fn to_wav(&self) -> Result<Vec<u8>> {
         match &self.format.tag {
-            FormatTag::ADPCM => adpcm::build_wav(self.format.clone().try_into()?, self.data),
+            FormatTag::ADPCM => Ok(adpcm::build_wav(self.format.clone().try_into()?, self.data)),
             _ => Err(Error::UnsupportedFormat(self.format.tag.clone()).into()),
         }
     }
