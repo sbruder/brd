@@ -385,7 +385,7 @@ impl ssq::SSQ {
 
             let mut shock_step_generator =
                 ShockStepGenerator::new(chart.difficulty.players * 4, config.shock_action.clone());
-            for step in &chart.steps.0 {
+            for step in &chart.steps {
                 trace!("Converting {:?} to hit object", step);
                 if let Some(mut step_hit_objects) = step.to_hit_objects(
                     chart.difficulty.players * 4,

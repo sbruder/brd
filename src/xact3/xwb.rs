@@ -1,25 +1,28 @@
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::io;
+use std::io::Cursor;
 
-use anyhow::Result;
-use log::{debug, info, warn};
-use nom::bytes::complete::tag;
-use nom::error::ParseError;
-use nom::multi::count;
-use nom::number::complete::{le_i32, le_u32};
-use nom::{take_str, IResult};
+use byteorder::{ReadBytesExt, LE};
+use log::{debug, info, trace, warn};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use thiserror::Error;
 
-use crate::utils;
-use crate::utils::exec_nom_parser;
+use crate::mini_parser;
+use crate::mini_parser::{MiniParser, MiniParserError};
 use crate::xact3::adpcm;
 
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("{0:?} is not a supported format")]
     UnsupportedFormat(FormatTag),
+    #[error("Invalid magic: expected “WBND”, found “{0}”")]
+    InvalidMagic(String),
+    #[error(transparent)]
+    IOError(#[from] io::Error),
+    #[error(transparent)]
+    MiniParserError(#[from] MiniParserError),
 }
 
 #[derive(Clone, FromPrimitive, Debug, PartialEq)]
@@ -41,7 +44,7 @@ struct Format {
 impl From<u32> for Format {
     fn from(format: u32) -> Self {
         Self {
-            tag: FormatTag::from_u32(format & ((1 << 2) - 1)).unwrap(),
+            tag: FormatTag::from_u32(format & ((1 << 2) - 1)).unwrap(), // all 2 bit ints covered
             channels: ((format >> 2) & ((1 << 3) - 1)) as u16,
             sample_rate: (format >> 5) & ((1 << 18) - 1),
             alignment: ((format >> 23) & ((1 << 8) - 1)) as u8,
@@ -75,21 +78,13 @@ impl TryInto<adpcm::WaveFormat> for Format {
 
 #[derive(Debug)]
 struct SegmentPosition {
-    start: usize,
-    end: usize,
+    offset: usize,
+    length: usize,
 }
 
 impl SegmentPosition {
-    fn get_from<'a>(&self, data: &'a [u8]) -> &'a [u8] {
-        &data[self.start..self.end]
-    }
-
-    fn parse<'a, E: ParseError<&'a [u8]>>(input: &'a [u8]) -> IResult<&[u8], Self, E> {
-        let (input, offset) = le_u32(input)?;
-        let (input, length) = le_u32(input)?;
-
-        let (start, end) = utils::offset_length_to_start_end(offset as usize, length as usize);
-        Ok((input, Self { start, end }))
+    fn get_from<'a>(&self, data: &'a [u8]) -> Result<&'a [u8], MiniParserError> {
+        mini_parser::get_slice_range(data, self.offset..self.offset + self.length)
     }
 }
 
@@ -98,20 +93,31 @@ struct Header {
 }
 
 impl Header {
-    fn parse(input: &[u8]) -> IResult<&[u8], Self> {
-        let (input, _magic) = tag("WBND")(input)?;
-        let (input, version) = le_u32(input)?;
+    fn parse(data: &[u8]) -> Result<Self, Error> {
+        let mut cursor = Cursor::new(data);
+
+        let magic = cursor.read_string(4)?;
+        if magic != "WBND" {
+            return Err(Error::InvalidMagic(magic));
+        }
+
+        let version = cursor.read_u32::<LE>()?;
         debug!("Recognised file (version {})", version);
         if version != 43 {
             warn!("The provided file has an unsupported version ({})", version);
         }
-        let (input, _header_version) = le_u32(input)?;
-        let (_input, segment_positions) = count(SegmentPosition::parse, 5)(input)?;
-        Ok((
-            // difference between first segment and parsed bytes of header
-            &input[8 * 5 + 12..segment_positions[0].start],
-            Self { segment_positions },
-        ))
+
+        let _header_version = cursor.read_u32::<LE>()?;
+        let mut segment_positions = Vec::new();
+        for _ in 0..5 {
+            let offset = cursor.read_u32::<LE>()?;
+            let length = cursor.read_u32::<LE>()?;
+            segment_positions.push(SegmentPosition {
+                offset: offset as usize,
+                length: length as usize,
+            })
+        }
+        Ok(Header { segment_positions })
     }
 }
 
@@ -119,26 +125,30 @@ impl Header {
 struct Info {
     entry_count: usize,
     name: String,
+    entry_name_element_size: usize,
 }
 
 impl Info {
-    fn parse(input: &[u8]) -> IResult<&[u8], Self> {
-        let (input, _flags) = le_u32(input)?;
-        let (input, entry_count) = le_u32(input)?;
-        let (input, name) = take_str64(input)?;
-        let (input, _entry_meta_data_element_size) = le_u32(input)?;
-        let (input, _entry_name_element_size) = le_u32(input)?;
-        let (input, _alignment) = le_u32(input)?;
-        let (input, _compact_format) = le_i32(input)?;
-        let (input, _build_time) = le_u32(input)?;
+    fn parse(data: &[u8]) -> Result<Self, Error> {
+        let mut cursor = Cursor::new(data);
 
-        Ok((
-            input,
-            Self {
-                entry_count: entry_count as usize,
-                name,
-            },
-        ))
+        let _flags = cursor.read_u32::<LE>()?;
+        let entry_count = cursor.read_u32::<LE>()?;
+        debug!("Number of entries: {}", entry_count);
+        let name = cursor.read_string(64)?;
+        debug!("Name of wave bank: {}", name);
+        let _entry_meta_data_element_size = cursor.read_u32::<LE>()?;
+        let entry_name_element_size = cursor.read_u32::<LE>()?;
+        debug!("Size of entry names: {}", entry_name_element_size);
+        let _alignment = cursor.read_u32::<LE>()?;
+        let _compact_format = cursor.read_u32::<LE>()?;
+        let _build_time = cursor.read_u32::<LE>()?;
+
+        Ok(Self {
+            entry_count: entry_count as usize,
+            name,
+            entry_name_element_size: entry_name_element_size as usize,
+        })
     }
 }
 
@@ -151,33 +161,30 @@ struct Entry {
 }
 
 impl Entry {
-    fn parse(input: &[u8]) -> IResult<&[u8], Self> {
-        let (input, _flags_and_duration) = le_u32(input)?;
-        let (input, format) = le_u32(input)?;
-        let (input, data_offset) = le_u32(input)?;
-        let (input, data_length) = le_u32(input)?;
-        let (input, _loop_start) = le_u32(input)?;
-        let (input, _loop_length) = le_u32(input)?;
+    fn parse(data: &[u8]) -> Result<Self, Error> {
+        let mut cursor = Cursor::new(data);
 
-        Ok((
-            input,
-            Self {
-                name: "".to_string(),
-                format: format.into(),
-                data_offset: data_offset as usize,
-                data_length: data_length as usize,
-            },
-        ))
+        let _flags_and_duration = cursor.read_u32::<LE>()?;
+        let format = cursor.read_u32::<LE>()?;
+        let data_offset = cursor.read_u32::<LE>()?;
+        let data_length = cursor.read_u32::<LE>()?;
+        let _loop_start = cursor.read_u32::<LE>()?;
+        let _loop_length = cursor.read_u32::<LE>()?;
+
+        trace!(
+            "Parsed Entry with Format {:?} at offset {} (length {})",
+            Format::from(format),
+            data_offset,
+            data_length
+        );
+
+        Ok(Self {
+            name: "".to_string(),
+            format: format.into(),
+            data_offset: data_offset as usize,
+            data_length: data_length as usize,
+        })
     }
-}
-
-fn take_str(input: &[u8], len: usize) -> IResult<&[u8], String> {
-    let (input, parsed) = take_str!(input, len)?;
-    Ok((input, parsed.replace("\0", "")))
-}
-
-fn take_str64(input: &[u8]) -> IResult<&[u8], String> {
-    take_str(input, 64)
 }
 
 #[derive(Debug, Clone)]
@@ -187,43 +194,56 @@ pub struct WaveBank<'a> {
 }
 
 impl WaveBank<'_> {
-    pub fn parse(data: &'_ [u8]) -> Result<WaveBank> {
+    pub fn parse(data: &'_ [u8]) -> Result<WaveBank, Error> {
         debug!("Parsing header");
-        let header = exec_nom_parser(Header::parse, data)?;
+        let header = Header::parse(mini_parser::get_slice_range(data, 0..52)?)?;
 
         debug!("Getting segments from file");
         let segments: Vec<&'_ [u8]> = header
             .segment_positions
             .iter()
-            .map(|x| x.get_from(data))
-            .collect();
+            .map(|segment| segment.get_from(data))
+            .collect::<Result<_, _>>()?;
 
         debug!("Parsing info (length {})", segments[0].len());
-        let info = exec_nom_parser(Info::parse, segments[0])?;
+        let info = Info::parse(segments[0])?;
+
         debug!("Parsing entries (length {})", segments[1].len());
-        let entries = exec_nom_parser(count(Entry::parse, info.entry_count as usize), segments[1])?;
+        let mut entries: Vec<Entry> = segments[1]
+            .chunks_exact(24)
+            .map(Entry::parse)
+            .collect::<Result<_, _>>()?;
+
         debug!("Parsing entry names (length {})", segments[3].len());
-        let entry_names = if segments[3].len() == info.entry_count as usize * 64 {
-            exec_nom_parser(count(take_str64, info.entry_count as usize), segments[3])?
-        } else {
-            warn!("Wave bank does not have name entries");
-            (0..info.entry_count).map(|x| x.to_string()).collect()
-        };
+        let entry_names: Vec<String> = segments[3]
+            .chunks_exact(info.entry_name_element_size)
+            .map(String::from_utf8_lossy)
+            .map(|name| name.into_owned())
+            .collect();
+
+        for (i, entry) in entries.iter_mut().enumerate() {
+            entry.name = entry_names
+                .get(i)
+                .map(|name| name.to_string())
+                .unwrap_or_else(|| {
+                    warn!("Entry does not have name; naming after index {}", i);
+                    i.to_string()
+                });
+        }
 
         let mut wave_bank = WaveBank {
             name: info.name,
             sounds: HashMap::new(),
         };
 
-        for (entry, name) in entries.iter().zip(entry_names.iter()) {
-            let (start, end) =
-                utils::offset_length_to_start_end(entry.data_offset, entry.data_length);
+        for entry in entries.iter() {
+            let end = entry.data_offset + entry.data_length;
             wave_bank.sounds.insert(
-                name.replace("\0", "").to_string(),
+                entry.name.replace("\0", "").to_string(),
                 Sound {
                     format: entry.format.clone(),
-                    data: &segments[4][start..end],
-                    size: end - start,
+                    data: mini_parser::get_slice_range(segments[4], entry.data_offset..end)?,
+                    size: entry.data_length,
                 },
             );
         }
@@ -242,10 +262,10 @@ pub struct Sound<'a> {
 }
 
 impl Sound<'_> {
-    pub fn to_wav(&self) -> Result<Vec<u8>> {
+    pub fn to_wav(&self) -> Result<Vec<u8>, Error> {
         match &self.format.tag {
             FormatTag::ADPCM => Ok(adpcm::build_wav(self.format.clone().try_into()?, self.data)),
-            _ => Err(Error::UnsupportedFormat(self.format.tag.clone()).into()),
+            _ => Err(Error::UnsupportedFormat(self.format.tag.clone())),
         }
     }
 }
