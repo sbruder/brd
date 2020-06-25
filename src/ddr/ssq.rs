@@ -1,7 +1,7 @@
 use std::convert::From;
 use std::fmt;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use log::{debug, info, trace, warn};
 use nom::bytes::complete::take;
 use nom::multi::many0;
@@ -126,27 +126,29 @@ impl Steps {
                         continue;
                     }
 
-                    let last_step = match Self::find_last(Self(parsed_steps.clone()), &row) {
-                        Ok(last_step) => last_step,
-                        Err(err) => {
-                            warn!("Could not add freeze arrow: {}; adding normal step", err);
-                            parsed_steps.push(Step::Step { beats, row });
-                            continue;
-                        }
-                    };
-
                     if FREEZE {
-                        parsed_steps.push(Step::Freeze {
-                            start: if let Step::Step { beats, .. } = parsed_steps[last_step] {
-                                beats
-                            } else {
-                                unreachable!()
-                            },
-                            end: beats,
-                            row,
-                        });
+                        match Self::find_last(Self(parsed_steps.clone()), &row) {
+                            Some(last_step) => {
+                                parsed_steps.push(Step::Freeze {
+                                    start: if let Step::Step { beats, .. } = parsed_steps[last_step]
+                                    {
+                                        beats
+                                    } else {
+                                        unreachable!()
+                                    },
+                                    end: beats,
+                                    row,
+                                });
 
-                        parsed_steps.remove(last_step);
+                                parsed_steps.remove(last_step);
+                            }
+                            None => {
+                                warn!(
+                                    "Could not find previous step for freeze, adding normal step"
+                                );
+                                parsed_steps.push(Step::Step { beats, row });
+                            }
+                        }
                     } else {
                         trace!("Freeze disabled, adding normal step");
                         parsed_steps.push(Step::Step { beats, row });
@@ -173,16 +175,16 @@ impl Steps {
         Ok((input, Self(parsed_steps)))
     }
 
-    fn find_last(steps: Self, row: &Row) -> Result<usize> {
+    fn find_last(steps: Self, row: &Row) -> Option<usize> {
         for i in (0..steps.0.len()).rev() {
             if let Step::Step { row: step_row, .. } = &steps.0[i] {
                 if step_row.clone().intersects(row.clone()) {
-                    return Ok(i);
+                    return Some(i);
                 }
             }
         }
 
-        Err(anyhow!("No previous step found on that column"))
+        None
     }
 }
 

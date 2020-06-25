@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use clap::Clap;
-use log::{debug, info, trace};
+use log::{debug, info, trace, warn};
 
 use crate::ddr::ssq;
 use crate::osu::beatmap;
@@ -142,25 +142,25 @@ impl ShockStepGenerator {
     }
 }
 
-fn get_time_from_beats(beats: f32, tempo_changes: &[ssq::TempoChange]) -> Result<i32> {
+fn get_time_from_beats(beats: f32, tempo_changes: &[ssq::TempoChange]) -> Option<i32> {
     for tempo_change in tempo_changes {
         // For TempoChanges that are infinitely short but exactly cover that beat, use the start
         // time of that TempoChange
         if (beats - tempo_change.start_beats).abs() < 0.001
             && (beats - tempo_change.end_beats).abs() < 0.001
         {
-            return Ok(tempo_change.start_ms);
+            return Some(tempo_change.start_ms);
         }
 
         if beats < tempo_change.end_beats {
-            return Ok(tempo_change.start_ms
-                + ((beats - tempo_change.start_beats) * tempo_change.beat_length) as i32);
+            return Some(
+                tempo_change.start_ms
+                    + ((beats - tempo_change.start_beats) * tempo_change.beat_length) as i32,
+            );
         }
     }
 
-    Err(anyhow!(
-        "Conversion of Step to HitObject failed: Beat lies outside of TimingPoints range"
-    ))
+    None
 }
 
 impl From<ssq::TempoChange> for beatmap::TimingPoint {
@@ -191,69 +191,93 @@ impl ssq::Step {
         num_columns: u8,
         tempo_changes: &ssq::TempoChanges,
         shock_step_generator: &mut ShockStepGenerator,
-    ) -> Result<Vec<beatmap::HitObject>> {
+    ) -> Option<Vec<beatmap::HitObject>> {
         let mut hit_objects = Vec::new();
 
         match self {
             ssq::Step::Step { beats, row } => {
-                let time = get_time_from_beats(*beats, &tempo_changes.0)?;
+                let time = get_time_from_beats(*beats, &tempo_changes.0);
 
-                let columns: Vec<bool> = row.clone().into();
+                match time {
+                    Some(time) => {
+                        let columns: Vec<bool> = row.clone().into();
 
-                for (column, active) in columns.iter().enumerate() {
-                    if *active {
-                        hit_objects.push(beatmap::HitObject::HitCircle {
-                            x: beatmap::column_to_x(column as u8, num_columns),
-                            y: 192,
-                            time,
-                            hit_sound: beatmap::HitSound {
-                                normal: true,
-                                whistle: false,
-                                finish: false,
-                                clap: false,
-                            },
-                            new_combo: false,
-                            skip_combo_colours: 0,
-                            hit_sample: beatmap::HitSample {
-                                normal_set: 0,
-                                addition_set: 0,
-                                index: 0,
-                                volume: 0,
-                                filename: "".to_string(),
-                            },
-                        })
+                        for (column, active) in columns.iter().enumerate() {
+                            if *active {
+                                hit_objects.push(beatmap::HitObject::HitCircle {
+                                    x: beatmap::column_to_x(column as u8, num_columns),
+                                    y: 192,
+                                    time,
+                                    hit_sound: beatmap::HitSound {
+                                        normal: true,
+                                        whistle: false,
+                                        finish: false,
+                                        clap: false,
+                                    },
+                                    new_combo: false,
+                                    skip_combo_colours: 0,
+                                    hit_sample: beatmap::HitSample {
+                                        normal_set: 0,
+                                        addition_set: 0,
+                                        index: 0,
+                                        volume: 0,
+                                        filename: "".to_string(),
+                                    },
+                                })
+                            }
+                        }
+                    }
+                    None => {
+                        warn!("Could not get start time of step, skipping");
+                        return None;
                     }
                 }
             }
             ssq::Step::Freeze { start, end, row } => {
-                let time = get_time_from_beats(*start, &tempo_changes.0)?;
-                let end_time = get_time_from_beats(*end, &tempo_changes.0)?;
+                let time = get_time_from_beats(*start, &tempo_changes.0);
+                let end_time = get_time_from_beats(*end, &tempo_changes.0);
 
-                let columns: Vec<bool> = row.clone().into();
+                match (time, end_time) {
+                    (Some(time), Some(end_time)) => {
+                        let columns: Vec<bool> = row.clone().into();
 
-                for (column, active) in columns.iter().enumerate() {
-                    if *active {
-                        hit_objects.push(beatmap::HitObject::Hold {
-                            column: column as u8,
-                            columns: num_columns,
-                            time,
-                            end_time,
-                            hit_sound: beatmap::HitSound {
-                                normal: true,
-                                whistle: false,
-                                finish: true,
-                                clap: false,
-                            },
-                            new_combo: false,
-                            skip_combo_colours: 0,
-                            hit_sample: beatmap::HitSample {
-                                normal_set: 0,
-                                addition_set: 0,
-                                index: 0,
-                                volume: 0,
-                                filename: "".to_string(),
-                            },
-                        })
+                        for (column, active) in columns.iter().enumerate() {
+                            if *active {
+                                hit_objects.push(beatmap::HitObject::Hold {
+                                    column: column as u8,
+                                    columns: num_columns,
+                                    time,
+                                    end_time,
+                                    hit_sound: beatmap::HitSound {
+                                        normal: true,
+                                        whistle: false,
+                                        finish: true,
+                                        clap: false,
+                                    },
+                                    new_combo: false,
+                                    skip_combo_colours: 0,
+                                    hit_sample: beatmap::HitSample {
+                                        normal_set: 0,
+                                        addition_set: 0,
+                                        index: 0,
+                                        volume: 0,
+                                        filename: "".to_string(),
+                                    },
+                                })
+                            }
+                        }
+                    }
+                    (None, Some(_)) => {
+                        warn!("Could not get start time of freeze, skipping");
+                        return None;
+                    }
+                    (Some(_), None) => {
+                        warn!("Could not get end time of freeze, skipping");
+                        return None;
+                    }
+                    (None, None) => {
+                        warn!("Could not get start and end time of freeze, skipping");
+                        return None;
                     }
                 }
             }
@@ -288,7 +312,7 @@ impl ssq::Step {
             }
         }
 
-        Ok(hit_objects)
+        Some(hit_objects)
     }
 }
 
@@ -363,12 +387,13 @@ impl ssq::SSQ {
                 ShockStepGenerator::new(chart.difficulty.players * 4, config.shock_action.clone());
             for step in &chart.steps.0 {
                 trace!("Converting {:?} to hit object", step);
-                let mut step_hit_objects = step.to_hit_objects(
+                if let Some(mut step_hit_objects) = step.to_hit_objects(
                     chart.difficulty.players * 4,
                     &self.tempo_changes,
                     &mut shock_step_generator,
-                )?;
-                hit_objects.0.append(&mut step_hit_objects);
+                ) {
+                    hit_objects.0.append(&mut step_hit_objects);
+                }
             }
 
             let converted_chart = ConvertedChart {
