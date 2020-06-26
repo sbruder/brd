@@ -58,7 +58,7 @@ Basic Usage:
 
 This is my first rust project. Don’t expect too much from the code in terms of
 quality, robustness or idiomacity (especially regarding error handling). There
-currently are no tests.
+currently are no tests for the actual functionality.
 
 Large portions of this tool would not have been possible without the following
 resources:
