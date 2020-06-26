@@ -59,6 +59,19 @@ impl Into<Vec<bool>> for PlayerRow {
     }
 }
 
+impl fmt::Display for PlayerRow {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}{}{}{}",
+            if self.left { "←" } else { " " },
+            if self.down { "↓" } else { " " },
+            if self.up { "↑" } else { " " },
+            if self.right { "→" } else { " " },
+        )
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Row {
     Single(PlayerRow),
@@ -76,6 +89,16 @@ impl Into<Vec<bool>> for Row {
                 row
             }
         }
+    }
+}
+
+impl fmt::Display for Row {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let player_rows = match self {
+            Self::Single(player_row) => vec![player_row],
+            Self::Double(player_row1, player_row2) => vec![player_row1, player_row2],
+        };
+        write!(f, "{}", utils::join_display_values(player_rows, " "))
     }
 }
 
