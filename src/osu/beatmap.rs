@@ -2,6 +2,8 @@ use num_derive::ToPrimitive;
 use num_traits::ToPrimitive;
 use std::fmt;
 
+use crate::utils;
+
 // Generic Type Aliases
 pub type OsuPixel = i16;
 pub type DecimalOsuPixel = f32;
@@ -17,14 +19,6 @@ fn bitflags(flags: [bool; 8]) -> u8 {
         value += ((0b1 as u8) << i) * (*flag as u8) as u8;
     }
     value
-}
-
-fn join_display_values<T: fmt::Display>(iterable: Vec<T>, separator: &'_ str) -> String {
-    iterable
-        .iter()
-        .map(|val| val.to_string())
-        .collect::<Vec<_>>()
-        .join(&separator)
 }
 
 fn assemble_hit_object_type(hit_object_type: u8, new_combo: bool, skip_combo_colours: U3) -> u8 {
@@ -182,7 +176,7 @@ impl fmt::Display for Events {
             [Events]\n\
             {}\n\
             ",
-            join_display_values(self.0.clone(), "\n")
+            utils::join_display_values(self.0.clone(), "\n")
         )
     }
 }
@@ -243,7 +237,7 @@ impl fmt::Display for TimingPoints {
             [TimingPoints]\n\
             {}\n\
             ",
-            join_display_values(self.0.clone(), "\n")
+            utils::join_display_values(self.0.clone(), "\n")
         )
     }
 }
@@ -313,7 +307,7 @@ impl fmt::Display for Colours {
             [Colours]\n\
             {}\n\
             ",
-            join_display_values(self.0.clone(), "\n")
+            utils::join_display_values(self.0.clone(), "\n")
         )
     }
 }
@@ -346,7 +340,7 @@ impl fmt::Display for Colour {
             f,
             "{} : {}",
             self.scope,
-            join_display_values(self.colour.to_vec(), ",")
+            utils::join_display_values(self.colour.to_vec(), ",")
         )
     }
 }
@@ -497,7 +491,7 @@ impl fmt::Display for HitObject {
                     .join("|"),
                 slides,
                 length,
-                join_display_values(edge_sounds.clone(), "|"),
+                utils::join_display_values(edge_sounds.clone(), "|"),
                 edge_sets
                     .iter()
                     .map(|set| format!(
@@ -559,7 +553,7 @@ impl fmt::Display for HitObjects {
             [HitObjects]\n\
             {}\n\
             ",
-            join_display_values(self.0.clone(), "\n")
+            utils::join_display_values(self.0.clone(), "\n")
         )
     }
 }
