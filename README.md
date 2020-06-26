@@ -32,8 +32,6 @@ Batch conversion is possible with the included shell script `batch_convert.sh`
  * Since *osu!mania* does not support shock arrows, it either ignores them or
    (by default) replaces them with a two-key combination (↑↓ or ←→); you can
    change this with the (`--shock-action` option)
- * Freezes do not work (I do not know how to get the start time yet) and
-   therefore are disabled in code (`ddr::ssq::FREEZE`)
  * Known problems listed for unxwb (for wave banks without entry names having
    2 entries, which often are preview and full song, the longest one is used by
    default).

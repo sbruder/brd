@@ -13,7 +13,6 @@ use crate::mini_parser::{MiniParser, MiniParserError};
 use crate::utils;
 
 const MEASURE_LENGTH: i32 = 4096;
-const FREEZE: bool = false;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -231,6 +230,10 @@ impl Chart {
 
         let mut parsed_steps = Vec::new();
 
+        // indices of (normal) steps that start a freeze (they are not needed after processing all
+        // steps as they are already included in the freezes)
+        let mut freeze_steps = Vec::new();
+
         for step in 0..count {
             let beats = measure_to_beats(measures[step]);
 
@@ -256,32 +259,24 @@ impl Chart {
                         continue;
                     }
 
-                    if FREEZE {
-                        match Self::find_last(parsed_steps.clone(), &row) {
-                            Some(last_step) => {
-                                parsed_steps.push(Step::Freeze {
-                                    start: if let Step::Step { beats, .. } = parsed_steps[last_step]
-                                    {
-                                        beats
-                                    } else {
-                                        unreachable!()
-                                    },
-                                    end: beats,
-                                    row,
-                                });
+                    match Self::find_last(parsed_steps.clone(), &row) {
+                        Some(last_step) => {
+                            parsed_steps.push(Step::Freeze {
+                                start: if let Step::Step { beats, .. } = parsed_steps[last_step] {
+                                    beats
+                                } else {
+                                    unreachable!()
+                                },
+                                end: beats,
+                                row,
+                            });
 
-                                parsed_steps.remove(last_step);
-                            }
-                            None => {
-                                warn!(
-                                    "Could not find previous step for freeze, adding normal step"
-                                );
-                                parsed_steps.push(Step::Step { beats, row });
-                            }
+                            freeze_steps.push(last_step);
                         }
-                    } else {
-                        trace!("Freeze disabled, adding normal step");
-                        parsed_steps.push(Step::Step { beats, row });
+                        None => {
+                            warn!("Could not find previous step for freeze, adding normal step");
+                            parsed_steps.push(Step::Step { beats, row });
+                        }
                     }
                 } else {
                     debug!(
@@ -298,6 +293,12 @@ impl Chart {
                     row: Row::new(steps[step], difficulty.players),
                 });
             }
+        }
+
+        // remove steps that start a freeze
+        freeze_steps.dedup();
+        for i in freeze_steps.iter().rev() {
+            parsed_steps.remove(*i);
         }
 
         debug!("Parsed {} steps", parsed_steps.len());
@@ -376,10 +377,6 @@ pub struct SSQ {
 
 impl SSQ {
     pub fn parse(data: &[u8]) -> Result<Self, Error> {
-        debug!(
-            "Configuration: measure length: {}, use freezes: {}",
-            MEASURE_LENGTH, FREEZE
-        );
         let mut cursor = Cursor::new(data);
 
         let mut ssq = Self {
