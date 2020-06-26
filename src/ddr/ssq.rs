@@ -32,7 +32,7 @@ fn measure_to_beats(metric: i32) -> f32 {
     4.0 * metric as f32 / MEASURE_LENGTH as f32
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct PlayerRow {
     pub left: bool,
     pub down: bool,
@@ -420,5 +420,55 @@ impl SSQ {
         info!("Parsed {} charts", ssq.charts.len());
 
         Ok(ssq)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quickcheck::TestResult;
+
+    #[quickcheck]
+    fn test_ssq_row_new(columns: u8, players: u8) -> TestResult {
+        match players {
+            1 | 2 => match (Row::new(columns, players), players) {
+                (Row::Single(..), 1) | (Row::Double(..), 2) => TestResult::passed(),
+                _ => TestResult::failed(),
+            },
+            _ => TestResult::must_fail(move || Row::new(columns, players)),
+        }
+    }
+
+    #[test]
+    fn test_ssq_player_row() {
+        assert_eq!(PlayerRow::from(0b11110000), PlayerRow::from(0b00000000));
+        assert_eq!(
+            PlayerRow::from(0b0001),
+            PlayerRow {
+                left: true,
+                ..Default::default()
+            }
+        );
+        assert_eq!(
+            PlayerRow::from(0b0010),
+            PlayerRow {
+                down: true,
+                ..Default::default()
+            }
+        );
+        assert_eq!(
+            PlayerRow::from(0b0100),
+            PlayerRow {
+                up: true,
+                ..Default::default()
+            }
+        );
+        assert_eq!(
+            PlayerRow::from(0b1000),
+            PlayerRow {
+                right: true,
+                ..Default::default()
+            }
+        );
     }
 }
