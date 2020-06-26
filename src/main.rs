@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
 use clap::Clap;
-use log::{debug, error, info, warn};
+use log::{debug, info, warn};
 
 use brd::converter;
 use brd::ddr::ssq::SSQ;
@@ -79,11 +79,6 @@ struct DDR2osu {
     convert: converter::ddr2osu::Config,
 }
 
-fn error(message: String) -> Result<()> {
-    error!("{}", message);
-    Err(anyhow!(message))
-}
-
 fn get_basename(path: &PathBuf) -> Option<&str> {
     match path.file_stem() {
         Some(stem) => stem.to_str(),
@@ -105,7 +100,7 @@ fn main() -> Result<()> {
             let entries = match opts.single_entry {
                 Some(name) => match wave_bank.sounds.get(&name) {
                     Some(_) => vec![name],
-                    None => return error(format!("Entry {} not found in wave bank", name)),
+                    None => return Err(anyhow!("Entry “{}” not found in wave bank", name)),
                 },
                 None => wave_bank.sounds.keys().cloned().collect(),
             };
@@ -157,7 +152,7 @@ fn main() -> Result<()> {
                 sounds.sort_unstable_by(|a, b| b.size.cmp(&a.size));
                 sounds[0].to_wav()?
             } else {
-                return error(format!(
+                return Err(anyhow!(
                     "Could not find matching sound in wave bank (searched for {})",
                     sound_name,
                 ));
