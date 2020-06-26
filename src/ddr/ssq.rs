@@ -360,9 +360,9 @@ impl fmt::Display for Difficulty {
         let difficulty = match self.difficulty {
             1 => "Basic",
             2 => "Difficult",
-            3 => "Challenge",
+            3 => "Expert",
             4 => "Beginner",
-            6 => "Expert",
+            6 => "Challenge",
             _ => "Unknown Difficulty",
         };
         write!(f, "{} {}", players, difficulty)
