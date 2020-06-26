@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::Clap;
 use log::{debug, info, warn};
 
@@ -93,9 +93,14 @@ fn main() -> Result<()> {
 
     match opts.subcmd {
         SubCommand::UnXWB(opts) => {
-            let xwb_data = fs::read(&opts.file)?;
-            let wave_bank = WaveBank::parse(&xwb_data)?;
-            info!("Opened wave bank “{}” from {:?}", wave_bank.name, opts.file);
+            let xwb_data = fs::read(&opts.file)
+                .with_context(|| format!("failed to read XWB file {}", &opts.file.display()))?;
+            let wave_bank = WaveBank::parse(&xwb_data).context("failed to parse XWB file")?;
+            info!(
+                "Opened wave bank “{}” from {}",
+                wave_bank.name,
+                &opts.file.display()
+            );
 
             let entries = match opts.single_entry {
                 Some(name) => match wave_bank.sounds.get(&name) {
@@ -112,37 +117,66 @@ fn main() -> Result<()> {
                         continue;
                     }
                     info!("Extracting {}", name);
-                    fs::write(format!("{}.wav", name), &sound.to_wav()?)?;
+                    let file_name = format!("{}.wav", name);
+                    fs::write(
+                        file_name.clone(),
+                        &sound.to_wav().with_context(|| {
+                            format!("failed to convert wave bank sound entry “{}” to WAV", name)
+                        })?,
+                    )
+                    .with_context(|| format!("failed to write sound to {}", file_name))?;
                 }
             }
         }
         SubCommand::DDR2osu(opts) => {
-            let sound_name = &opts
-                .sound_name
-                .unwrap_or(match get_basename(&opts.ssq_file) {
-                    Some(basename) => basename.to_string(),
-                    None => return error(
-                        "Could not extract chart id from file name. Please specify it manually."
-                            .to_string(),
-                    ),
-                });
+            let sound_name =
+                &opts
+                    .sound_name
+                    .clone()
+                    .unwrap_or(match get_basename(&opts.ssq_file) {
+                        Some(basename) => basename.to_string(),
+                        None => {
+                            return Err(anyhow!(
+                        "Could not extract chart id from file name. Please specify it manually."))
+                        }
+                    });
 
             debug!(
-                "Converting {:?} and sound {} from {:?} to {:?}",
-                opts.ssq_file, sound_name, opts.xwb_file, opts.out_file
+                "Converting {} and sound {} from {} to {}",
+                opts.ssq_file.display(),
+                sound_name,
+                opts.xwb_file.display(),
+                opts.out_file.display()
             );
 
-            let ssq_data = fs::read(&opts.ssq_file)?;
-            let ssq = SSQ::parse(&ssq_data)?;
+            let ssq_data = fs::read(&opts.ssq_file)
+                .with_context(|| format!("failed to read SSQ file {}", &opts.ssq_file.display()))?;
+            let ssq = SSQ::parse(&ssq_data).context("failed to parse SSQ file")?;
 
-            let convert_config = opts.convert;
-            let beatmaps = ssq.to_beatmaps(&convert_config)?;
+            let beatmaps = ssq
+                .to_beatmaps(&opts.convert)
+                .context("failed to convert DDR step chart to osu!mania beatmap")?;
 
-            let xwb_data = fs::read(&opts.xwb_file)?;
-            let wave_bank = WaveBank::parse(&xwb_data)?;
+            let xwb_data = fs::read(&opts.xwb_file).with_context(|| {
+                format!(
+                    "failed to read XWB file {}",
+                    &opts.xwb_file.clone().display()
+                )
+            })?;
+            let wave_bank = WaveBank::parse(&xwb_data).context("failed to parse XWB file")?;
 
             let audio_data = if wave_bank.sounds.contains_key(sound_name) {
-                wave_bank.sounds.get(sound_name).unwrap().to_wav()?
+                wave_bank
+                    .sounds
+                    .get(sound_name)
+                    .unwrap()
+                    .to_wav()
+                    .with_context(|| {
+                        format!(
+                            "failed to convert wave bank sound entry “{}” to WAV",
+                            sound_name
+                        )
+                    })?
             } else if wave_bank.sounds.len() == 2 {
                 warn!(
                     "Sound {} not found in wave bank, but it has two entries; assuming these are preview and full song",
@@ -150,7 +184,12 @@ fn main() -> Result<()> {
                 );
                 let mut sounds = wave_bank.sounds.values().collect::<Vec<&XWBSound>>();
                 sounds.sort_unstable_by(|a, b| b.size.cmp(&a.size));
-                sounds[0].to_wav()?
+                sounds[0].to_wav().with_context(|| {
+                    format!(
+                        "failed to convert wave bank sound entry “{}” to WAV",
+                        sound_name
+                    )
+                })?
             } else {
                 return Err(anyhow!(
                     "Could not find matching sound in wave bank (searched for {})",
@@ -162,7 +201,9 @@ fn main() -> Result<()> {
                 beatmaps,
                 assets: vec![("audio.wav", &audio_data)],
             };
-            osz.write(&opts.out_file)?;
+            osz.write(&opts.out_file).with_context(|| {
+                format!("failed to write OSZ file to {}", opts.out_file.display())
+            })?;
         }
     }
     Ok(())
