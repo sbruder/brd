@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use std::io;
 use std::io::Cursor;
+use std::num;
 
 use byteorder::{ReadBytesExt, LE};
 use log::{debug, info, trace, warn};
@@ -23,6 +24,10 @@ pub enum Error {
     IOError(#[from] io::Error),
     #[error(transparent)]
     MiniParserError(#[from] MiniParserError),
+    #[error(transparent)]
+    ADPCMError(#[from] adpcm::Error),
+    #[error(transparent)]
+    TryFromIntError(#[from] num::TryFromIntError),
 }
 
 #[derive(Clone, FromPrimitive, Debug, PartialEq)]
@@ -60,11 +65,11 @@ impl TryInto<adpcm::WaveFormat> for Format {
             return Err(Error::UnsupportedFormat(self.tag));
         }
 
-        let n_block_align = (self.alignment as u16 + 22) * self.channels;
+        let n_block_align = (u16::from(self.alignment) + 22) * self.channels;
         let n_samples_per_block =
             (((n_block_align - (7 * self.channels)) * 8) / (4 * self.channels)) + 2;
         let n_avg_bytes_per_sec =
-            (self.sample_rate / n_samples_per_block as u32) * n_block_align as u32;
+            (self.sample_rate / u32::from(n_samples_per_block)) * u32::from(n_block_align);
 
         Ok(adpcm::WaveFormat {
             n_channels: self.channels,
@@ -113,8 +118,8 @@ impl Header {
             let offset = cursor.read_u32::<LE>()?;
             let length = cursor.read_u32::<LE>()?;
             segment_positions.push(SegmentPosition {
-                offset: offset as usize,
-                length: length as usize,
+                offset: offset.try_into()?,
+                length: length.try_into()?,
             })
         }
         Ok(Header { segment_positions })
@@ -145,9 +150,9 @@ impl Info {
         let _build_time = cursor.read_u32::<LE>()?;
 
         Ok(Self {
-            entry_count: entry_count as usize,
+            entry_count: entry_count.try_into()?,
             name,
-            entry_name_element_size: entry_name_element_size as usize,
+            entry_name_element_size: entry_name_element_size.try_into()?,
         })
     }
 }
@@ -181,8 +186,8 @@ impl Entry {
         Ok(Self {
             name: "".to_string(),
             format: format.into(),
-            data_offset: data_offset as usize,
-            data_length: data_length as usize,
+            data_offset: data_offset.try_into()?,
+            data_length: data_length.try_into()?,
         })
     }
 }
@@ -264,7 +269,10 @@ pub struct Sound<'a> {
 impl Sound<'_> {
     pub fn to_wav(&self) -> Result<Vec<u8>, Error> {
         match &self.format.tag {
-            FormatTag::ADPCM => Ok(adpcm::build_wav(self.format.clone().try_into()?, self.data)),
+            FormatTag::ADPCM => Ok(adpcm::build_wav(
+                self.format.clone().try_into()?,
+                self.data,
+            )?),
             _ => Err(Error::UnsupportedFormat(self.format.tag.clone())),
         }
     }

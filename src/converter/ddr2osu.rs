@@ -345,7 +345,7 @@ impl ConvertedChart {
             },
             difficulty: beatmap::Difficulty {
                 hp_drain_rate: config.hp_drain.map_from(self.difficulty.clone().into()),
-                circle_size: self.difficulty.players as f32 * 4.0,
+                circle_size: f32::from(self.difficulty.players) * 4.0,
                 overall_difficulty: config.accuracy.map_from(self.difficulty.clone().into()),
                 approach_rate: 8.0,
                 slider_multiplier: 0.64,

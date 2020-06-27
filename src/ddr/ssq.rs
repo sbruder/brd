@@ -4,6 +4,7 @@ use std::fmt;
 use std::io;
 use std::io::prelude::*;
 use std::io::Cursor;
+use std::num;
 
 use byteorder::{ReadBytesExt, LE};
 use log::{debug, info, trace, warn};
@@ -12,7 +13,7 @@ use thiserror::Error;
 use crate::mini_parser::{MiniParser, MiniParserError};
 use crate::utils;
 
-const MEASURE_LENGTH: i32 = 4096;
+const MEASURE_LENGTH: f32 = 4096.0;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -21,7 +22,7 @@ pub enum Error {
     #[error(transparent)]
     IOError(#[from] io::Error),
     #[error(transparent)]
-    TryFromIntError(#[from] std::num::TryFromIntError),
+    TryFromIntError(#[from] num::TryFromIntError),
     #[error(transparent)]
     MiniParserError(#[from] MiniParserError),
 }
@@ -29,7 +30,7 @@ pub enum Error {
 /// Convert time offset to beats
 /// time offset is the measure times MEASURE_LENGTH
 fn measure_to_beats(metric: i32) -> f32 {
-    4.0 * metric as f32 / MEASURE_LENGTH as f32
+    4.0 * metric as f32 / MEASURE_LENGTH
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -385,7 +386,7 @@ impl SSQ {
         };
 
         loop {
-            let length = cursor.read_i32::<LE>()? as usize;
+            let length: usize = cursor.read_i32::<LE>()?.try_into()?;
             trace!("Found chunk (length {})", length);
             if length == 0 {
                 break;
@@ -401,7 +402,7 @@ impl SSQ {
             match chunk_type {
                 1 => {
                     debug!("Parsing tempo changes (ticks/s: {})", parameter);
-                    ssq.tempo_changes = TempoChanges::parse(parameter as i32, &data)?;
+                    ssq.tempo_changes = TempoChanges::parse(parameter.into(), &data)?;
                 }
                 3 => {
                     debug!("Parsing step chunk ({})", Difficulty::from(parameter));

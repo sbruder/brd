@@ -29,7 +29,7 @@ fn assemble_hit_object_type(hit_object_type: u8, new_combo: bool, skip_combo_col
 }
 
 pub fn column_to_x(column: u8, columns: u8) -> OsuPixel {
-    ((512 * column as OsuPixel + 256) / columns as OsuPixel) as OsuPixel
+    (512 * OsuPixel::from(column) + 256) / OsuPixel::from(columns)
 }
 
 #[derive(ToPrimitive, Clone)]

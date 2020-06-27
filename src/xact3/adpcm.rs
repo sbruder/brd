@@ -1,7 +1,9 @@
+use std::convert::TryInto;
 use std::io::{Cursor, Write};
 
 use byteorder::{LittleEndian, WriteBytesExt};
 use log::{debug, trace};
+use thiserror::Error;
 
 #[rustfmt::skip]
 const COEFFS: &[CoefSet] = &[
@@ -13,6 +15,12 @@ const COEFFS: &[CoefSet] = &[
     (460, -208),
     (392, -232),
 ];
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("unable to create file of size {0} (larger than 2^32)")]
+    TooLarge(usize),
+}
 
 trait WaveChunk {
     fn to_chunk(&self) -> Vec<u8>;
@@ -87,17 +95,22 @@ impl WaveChunk for RIFFHeader {
     }
 }
 
-pub fn build_wav(format: WaveFormat, data: &[u8]) -> Vec<u8> {
+pub fn build_wav(format: WaveFormat, data: &[u8]) -> Result<Vec<u8>, Error> {
     debug!("Building file");
+    let length: u32 = data
+        .len()
+        .try_into()
+        .map_err(|_| Error::TooLarge(data.len()))?;
+
     let riff_header = RIFFHeader {
-        file_size: 82 + data.len() as u32,
+        file_size: 82 + length,
     };
 
     let fact = WaveFact {
-        length_samples: ((data.len() as u32 / format.n_block_align as u32)
-            * ((format.n_block_align - (7 * format.n_channels)) * 8) as u32
+        length_samples: ((length / u32::from(format.n_block_align))
+            * u32::from((format.n_block_align - (7 * format.n_channels)) * 8)
             / 4)
-            / format.n_channels as u32,
+            / u32::from(format.n_channels),
     };
 
     let mut buf = Cursor::new(Vec::new());
@@ -110,8 +123,8 @@ pub fn build_wav(format: WaveFormat, data: &[u8]) -> Vec<u8> {
     buf.write_all(&fact.to_chunk()).unwrap();
 
     write!(buf, "data").unwrap();
-    buf.write_u32::<LittleEndian>(data.len() as u32).unwrap();
+    buf.write_u32::<LittleEndian>(length).unwrap();
     buf.write_all(data).unwrap();
 
-    buf.into_inner()
+    Ok(buf.into_inner())
 }
