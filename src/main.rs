@@ -6,7 +6,7 @@ use clap::Clap;
 use log::{debug, info, warn};
 
 use brd::converter;
-use brd::ddr::ssq::SSQ;
+use brd::ddr::{arc::ARC, ssq::SSQ};
 use brd::osu;
 use brd::xact3::xwb::{Sound as XWBSound, WaveBank};
 
@@ -26,10 +26,26 @@ enum SubCommand {
     )]
     UnXWB(UnXWB),
     #[clap(
+        name = "unarc",
+        about = "Extracts files from DDR A ARC archives",
+        display_order = 1
+    )]
+    UnARC(UnARC),
+    #[clap(
         about = "Converts DDR step charts to osu!mania beatmaps",
         display_order = 1
     )]
     DDR2osu(DDR2osu),
+}
+
+#[derive(Clap)]
+struct UnARC {
+    #[clap(short, long, about = "List available files and exit")]
+    list_files: bool,
+    #[clap(short = "f", long, about = "Only extract this file")]
+    single_file: Option<PathBuf>,
+    #[clap(name = "file")]
+    file: PathBuf,
 }
 
 #[derive(Clap)]
@@ -125,6 +141,35 @@ fn main() -> Result<()> {
                         })?,
                     )
                     .with_context(|| format!("failed to write sound to {}", file_name))?;
+                }
+            }
+        }
+        SubCommand::UnARC(opts) => {
+            let arc_data = fs::read(&opts.file)
+                .with_context(|| format!("failed to read ARC file {}", &opts.file.display()))?;
+            let arc = ARC::parse(&arc_data).context("failed to parse ARC file")?;
+
+            let files = match opts.single_file {
+                Some(path) => match arc.files.get(&path) {
+                    Some(_) => vec![path],
+                    None => return Err(anyhow!("File “{}” not found in archive", path.display())),
+                },
+                None => arc.files.keys().cloned().collect(),
+            };
+
+            for (path, data) in arc.files.iter() {
+                if files.contains(&path) {
+                    if opts.list_files {
+                        println!("{}", path.display());
+                    } else {
+                        info!("Writing {}", path.display());
+                        if let Some(parent) = path.parent() {
+                            fs::create_dir_all(parent)?;
+                        }
+                        fs::write(path, data).with_context(|| {
+                            format!("failed to write file to “{}”", path.display())
+                        })?;
+                    }
                 }
             }
         }

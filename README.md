@@ -1,8 +1,7 @@
 # BRD
 
 BRD is a tool for working with [*Dance Dance Revolution*][ddr] step charts and
-wave banks. It currently supports conversion to [*osu!mania*][osu!mania]
-beatmaps and extraction of sounds from wave banks.
+wave banks. For currently supported features, see the [Modes](#modes) section.
 
 ## Installation
 
@@ -45,6 +44,16 @@ Basic Usage:
     brd unxwb file.xwb
     brd unxwb -l file.xwb
 
+### unarc
+
+This can list and extract files from DDR A ARC archives. It extracts the
+contents into the current directory.
+
+Basic Usage:
+
+    brd unarc file.arc
+    brd unarc -l file.arc
+
 #### Known Problems
 
  * It only supports sounds in [ADPCM][ADPCM] format. If you want to extract
@@ -69,6 +78,7 @@ resources:
  * The [official osu! file format documentation][osu-doc]
  * [MonoGame][MonoGame]’s [XWB implementation][MonoGame-xwb]
  * [Luigi Auriemma][aluigi]’s [unxwb][unxwb] (especially the ADPCM header part)
+ * [mon][mon]’s [ddr\_arc\_extract][ddr_arc_extract]
 
 ## License
 
@@ -82,6 +92,8 @@ This project is not affiliated with ppy or Konami.
 [SaxxonPike]: https://github.com/SaxxonPike
 [aluigi]: http://aluigi.altervista.org/
 [ddr]: https://en.wikipedia.org/wiki/Dance_Dance_Revolution
+[ddr_arc_extract]: https://github.com/mon/ddr_arc_extract
+[mon]: https://github.com/mon
 [multimedia.cx-XSB]: https://wiki.multimedia.cx/index.php/XACT#Sound_Banks_.28.xsb.29
 [osu!mania]: https://osu.ppy.sh/help/wiki/Game_Modes/osu%21mania
 [osu-doc]: https://osu.ppy.sh/help/wiki/osu!_File_Formats/Osu_(file_format)

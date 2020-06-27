@@ -51,6 +51,7 @@ dependencies = [
  "anyhow",
  "byteorder",
  "clap",
+ "konami-lz77",
  "log",
  "num-derive",
  "num-traits",
@@ -185,6 +186,11 @@ checksum = "c398b2b113b55809ceb9ee3e753fcbac793f1956663f3c36549c1346015c2afe"
 dependencies = [
  "autocfg",
 ]
+
+[[package]]
+name = "konami-lz77"
+version = "0.2.0"
+source = "git+https://github.com/sbruder/konami-lz77#78c83a87a64d3c1826e168fb90ea9d671f8cfcff"
 
 [[package]]
 name = "lazy_static"
