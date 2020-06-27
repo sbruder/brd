@@ -57,7 +57,7 @@ pub struct Config {
     #[clap(
         long = "hp",
         about = "Range of HP drain (beginner:challenge)",
-        default_value = "4:8"
+        default_value = "2:4"
     )]
     pub hp_drain: ConfigRange,
     #[clap(
