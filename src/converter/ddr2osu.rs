@@ -251,7 +251,7 @@ impl ssq::Step {
                                     hit_sound: beatmap::HitSound {
                                         normal: true,
                                         whistle: false,
-                                        finish: true,
+                                        finish: false,
                                         clap: false,
                                     },
                                     new_combo: false,
