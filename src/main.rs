@@ -1,13 +1,17 @@
 use std::fs;
+use std::io;
+use std::io::Write;
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Context, Result};
 use clap::Clap;
 use log::{debug, info, warn};
+use tabwriter::TabWriter;
 
 use brd::converter;
-use brd::ddr::{arc::ARC, ssq::SSQ};
+use brd::ddr::{arc::ARC, musicdb, ssq::SSQ};
 use brd::osu;
+use brd::utils;
 use brd::xact3::xwb::{Sound as XWBSound, WaveBank};
 
 #[derive(Clap)]
@@ -32,6 +36,12 @@ enum SubCommand {
     )]
     UnARC(UnARC),
     #[clap(
+        name = "musicdb",
+        about = "Shows entries from musicdb (supports musicdb.xml and startup.arc from DDR A)",
+        display_order = 1
+    )]
+    MusicDB(MusicDB),
+    #[clap(
         about = "Converts DDR step charts to osu!mania beatmaps",
         display_order = 1
     )]
@@ -54,6 +64,12 @@ struct UnXWB {
     list_entries: bool,
     #[clap(short = "e", long, about = "Only extract this entry")]
     single_entry: Option<String>,
+    #[clap(name = "file")]
+    file: PathBuf,
+}
+
+#[derive(Clap)]
+struct MusicDB {
     #[clap(name = "file")]
     file: PathBuf,
 }
@@ -172,6 +188,64 @@ fn main() -> Result<()> {
                     }
                 }
             }
+        }
+        SubCommand::MusicDB(opts) => {
+            let extension = opts
+                .file
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .unwrap_or("");
+            let musicdb = match extension {
+                "arc" => {
+                    let arc_data = fs::read(&opts.file).with_context(|| {
+                        format!("failed to read musicdb ARC file {}", &opts.file.display())
+                    })?;
+
+                    musicdb::MusicDB::parse_from_startup_arc(&arc_data)
+                        .context("failed to parse musicdb from ARC file")?
+                }
+                _ => {
+                    if extension != "xml" {
+                        warn!("Did not find known extension (arc, xml), trying to parse as XML");
+                    }
+
+                    let musicdb_data = fs::read_to_string(&opts.file).with_context(|| {
+                        format!("failed to read musicdb XML file {}", &opts.file.display())
+                    })?;
+
+                    musicdb::MusicDB::parse(&musicdb_data).context("failed to parse musicdb XML")?
+                }
+            };
+
+            let mut tw = TabWriter::new(io::stdout());
+
+            writeln!(
+                tw,
+                "Code\tBasename\tName\tArtist\tBPM\tSeries\tDifficulties (Single)\t(Double)"
+            )?;
+
+            for song in musicdb.music {
+                // Filter 0s
+                let diff_lv: (Vec<&u8>, Vec<&u8>) = (
+                    song.diff_lv[..5].iter().filter(|x| **x != 0).collect(),
+                    song.diff_lv[5..].iter().filter(|x| **x != 0).collect(),
+                );
+
+                writeln!(
+                    tw,
+                    "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                    song.mcode,
+                    song.basename,
+                    song.title,
+                    song.artist,
+                    song.bpmmax,
+                    song.series,
+                    utils::join_display_values(diff_lv.0, ", "),
+                    utils::join_display_values(diff_lv.1, ", ")
+                )?;
+            }
+
+            tw.flush()?;
         }
         SubCommand::DDR2osu(opts) => {
             let sound_name =

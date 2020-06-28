@@ -1,7 +1,7 @@
 # BRD
 
-BRD is a tool for working with [*Dance Dance Revolution*][ddr] step charts and
-wave banks. For currently supported features, see the [Modes](#modes) section.
+BRD is a tool for working with [*Dance Dance Revolution*][ddr] related data.
+For currently supported features, see the [Modes](#modes) section.
 
 ## Installation
 
@@ -53,6 +53,11 @@ Basic Usage:
 
     brd unarc file.arc
     brd unarc -l file.arc
+
+### musicdb
+
+This lists all entries from `musicdb.xml` or `startup.arc` files (only DDR A is
+supported).
 
 #### Known Problems
 
