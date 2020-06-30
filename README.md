@@ -27,9 +27,6 @@ brd ddr2osu -s file.ssq -x file.xwb -o file.osz -m startup.arc
 
 To learn more about supported options run `brd ddr2osu --help`
 
-Batch conversion is possible with the included shell script `batch_convert.sh`
-(usage guide at the top of the script).
-
 #### Known Problems
 
  * Since *osu!mania* does not support shock arrows, it either ignores them or
@@ -38,6 +35,19 @@ Batch conversion is possible with the included shell script `batch_convert.sh`
  * Known problems listed for unxwb (for wave banks without entry names having
    2 entries, which often are preview and full song, the longest one is used by
    default).
+
+### ddr2osu-batch
+
+This batch converts songs from a musicdb (and therefore currently only supports
+DDR A).
+
+Basic usage (the `ssq` directory includes step charts and the `xwb` directory
+includes wave banks):
+
+    brd ddr2osu-batch -m startup.arc -o out -s ssq -x xwb --source "Dance Dance Revolution A"
+
+Batch conversion for older versions is possible with the included shell script
+`batch_convert.sh` (usage guide at the top of the script).
 
 ### unxwb
 
