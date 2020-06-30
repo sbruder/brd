@@ -167,8 +167,8 @@ impl TempoChanges {
         let mut cursor = Cursor::new(data);
 
         let count = cursor.read_u32::<LE>()?.try_into()?;
-        let measure = cursor.read_n_u32(count)?;
-        let tempo_data = cursor.read_n_u32(count)?;
+        let measure = cursor.read_n_i32(count)?;
+        let tempo_data = cursor.read_n_i32(count)?;
 
         let mut entries = Vec::new();
 
@@ -220,7 +220,7 @@ impl Chart {
         let mut cursor = Cursor::new(data);
 
         let count = cursor.read_u32::<LE>()?.try_into()?;
-        let measures = cursor.read_n_u32(count)?;
+        let measures = cursor.read_n_i32(count)?;
         let mut steps = vec![0; count];
         cursor.read_exact(&mut steps)?;
 

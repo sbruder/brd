@@ -24,9 +24,9 @@ pub trait MiniParser: io::Read {
         Ok(buf.replace("\0", ""))
     }
 
-    /// Read `n` `u32`.
+    /// Read `n` `i32`.
     #[inline]
-    fn read_n_u32(&mut self, n: usize) -> Result<Vec<i32>, MiniParserError> {
+    fn read_n_i32(&mut self, n: usize) -> Result<Vec<i32>, MiniParserError> {
         let mut buf = vec![0; 4 * n];
         self.read_exact(&mut buf)?;
         Ok(buf
