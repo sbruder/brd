@@ -1,3 +1,4 @@
+use std::convert::TryInto;
 use std::fs;
 use std::io;
 use std::io::Write;
@@ -5,7 +6,8 @@ use std::path::PathBuf;
 
 use anyhow::{anyhow, Context, Result};
 use clap::Clap;
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
+use pbr::ProgressBar;
 use tabwriter::TabWriter;
 
 use brd::converter;
@@ -46,6 +48,12 @@ enum SubCommand {
         display_order = 1
     )]
     DDR2osu(Box<DDR2osu>),
+    #[clap(
+        name = "ddr2osu-batch",
+        about = "Batch version of ddr2osu",
+        display_order = 1
+    )]
+    BatchDDR2osu(BatchDDR2osu),
 }
 
 #[derive(Clap)]
@@ -110,11 +118,50 @@ struct DDR2osu {
     musicdb_file: Option<PathBuf>,
     #[clap(
         short = "n",
-        name = "sound name",
+        name = "basename",
         about = "Sound in wave bank, otherwise inferred from SSQ filename",
         display_order = 2
     )]
-    sound_name: Option<String>,
+    basename: Option<String>,
+    #[clap(flatten)]
+    convert: converter::ddr2osu::Config,
+}
+
+#[derive(Clap)]
+
+struct BatchDDR2osu {
+    #[clap(
+        short = "s",
+        long = "ssq",
+        name = "ssq_dir",
+        about = "directory with DDR step chart files",
+        display_order = 1
+    )]
+    ssq_dir: PathBuf,
+    #[clap(
+        short = "x",
+        long = "xwb",
+        name = "xwb_dir",
+        about = "directory with XAC3 wave bank files",
+        display_order = 1
+    )]
+    xwb_dir: PathBuf,
+    #[clap(
+        short = "o",
+        long = "out",
+        name = "out_dir",
+        about = "output directory",
+        display_order = 1
+    )]
+    out_dir: PathBuf,
+    #[clap(
+        short = "m",
+        long = "musicdb",
+        name = "musicdb.xml|startup.arc",
+        about = "musicdb.xml or startup.arc for metadata",
+        display_order = 1
+    )]
+    musicdb_file: PathBuf,
     #[clap(flatten)]
     convert: converter::ddr2osu::Config,
 }
@@ -148,6 +195,75 @@ fn read_musicdb(path: &PathBuf) -> Result<musicdb::MusicDB> {
             musicdb::MusicDB::parse(&musicdb_data).context("failed to parse musicdb XML")
         }
     }
+}
+
+fn ddr2osu(
+    ssq_file: PathBuf,
+    xwb_file: PathBuf,
+    out_file: PathBuf,
+    basename: String,
+    convert_options: converter::ddr2osu::Config,
+) -> Result<()> {
+    debug!(
+        "Converting {} and sound {} from {} to {}",
+        ssq_file.display(),
+        basename,
+        xwb_file.display(),
+        out_file.display()
+    );
+
+    let ssq_data = fs::read(&ssq_file)
+        .with_context(|| format!("failed to read SSQ file {}", &ssq_file.display()))?;
+    let ssq = SSQ::parse(&ssq_data).context("failed to parse SSQ file")?;
+
+    let beatmaps = ssq
+        .to_beatmaps(&convert_options)
+        .context("failed to convert DDR step chart to osu!mania beatmap")?;
+
+    let xwb_data = fs::read(&xwb_file)
+        .with_context(|| format!("failed to read XWB file {}", &xwb_file.clone().display()))?;
+    let wave_bank = WaveBank::parse(&xwb_data).context("failed to parse XWB file")?;
+
+    let audio_data = if wave_bank.sounds.contains_key(&basename) {
+        wave_bank
+            .sounds
+            .get(&basename)
+            .unwrap()
+            .to_wav()
+            .with_context(|| {
+                format!(
+                    "failed to convert wave bank sound entry “{}” to WAV",
+                    basename
+                )
+            })?
+    } else if wave_bank.sounds.len() == 2 {
+        warn!(
+            "Sound {} not found in wave bank, but it has two entries; assuming these are preview and full song",
+            basename
+        );
+        let mut sounds = wave_bank.sounds.values().collect::<Vec<&XWBSound>>();
+        sounds.sort_unstable_by(|a, b| b.size.cmp(&a.size));
+        sounds[0].to_wav().with_context(|| {
+            format!(
+                "failed to convert wave bank sound entry “{}” to WAV",
+                basename
+            )
+        })?
+    } else {
+        return Err(anyhow!(
+            "Could not find matching sound in wave bank (searched for {})",
+            basename,
+        ));
+    };
+
+    let osz = osu::osz::Archive {
+        beatmaps,
+        assets: vec![("audio.wav", &audio_data)],
+    };
+    osz.write(&out_file)
+        .with_context(|| format!("failed to write OSZ file to {}", out_file.display()))?;
+
+    Ok(())
 }
 
 fn main() -> Result<()> {
@@ -255,37 +371,23 @@ fn main() -> Result<()> {
             tw.flush()?;
         }
         SubCommand::DDR2osu(opts) => {
-            let sound_name =
-                &opts
-                    .sound_name
-                    .clone()
-                    .unwrap_or(match get_basename(&opts.ssq_file) {
-                        Some(basename) => basename.to_string(),
-                        None => {
-                            return Err(anyhow!(
-                        "Could not extract chart id from file name. Please specify it manually."))
-                        }
-                    });
-
-            debug!(
-                "Converting {} and sound {} from {} to {}",
-                opts.ssq_file.display(),
-                sound_name,
-                opts.xwb_file.display(),
-                opts.out_file.display()
+            let basename = opts.basename.clone().unwrap_or(
+                get_basename(&opts.ssq_file)
+                    .map(|basename| basename.to_string())
+                    .ok_or_else(|| {
+                        anyhow!(
+                        "Could not extract chart id from file name. Please specify it manually."
+                    )
+                    })?,
             );
 
-            let ssq_data = fs::read(&opts.ssq_file)
-                .with_context(|| format!("failed to read SSQ file {}", &opts.ssq_file.display()))?;
-            let ssq = SSQ::parse(&ssq_data).context("failed to parse SSQ file")?;
-
-            let mut convert_options = opts.convert.clone();
+            let mut convert_options = opts.convert;
 
             if let Some(musicdb_file) = &opts.musicdb_file {
                 debug!("Reading metadata from {}", musicdb_file.display());
                 let musicdb = read_musicdb(&musicdb_file)?;
                 let musicdb_entry = musicdb
-                    .get_entry_from_basename(sound_name)
+                    .get_entry_from_basename(&basename)
                     .ok_or_else(|| anyhow!("Entry not found in musicdb"))?;
                 if convert_options.metadata.title.is_none() {
                     info!("Using title from musicdb: “{}”", musicdb_entry.title);
@@ -297,60 +399,58 @@ fn main() -> Result<()> {
                 }
                 convert_options.metadata.levels = Some(musicdb_entry.diff_lv.clone());
             } else if convert_options.metadata.title.is_none() {
-                convert_options.metadata.title = Some(sound_name.to_string());
+                convert_options.metadata.title = Some(basename.to_string());
             }
 
-            let beatmaps = ssq
-                .to_beatmaps(&convert_options)
-                .context("failed to convert DDR step chart to osu!mania beatmap")?;
+            ddr2osu(
+                opts.ssq_file,
+                opts.xwb_file,
+                opts.out_file,
+                basename,
+                convert_options,
+            )?
+        }
+        SubCommand::BatchDDR2osu(opts) => {
+            let musicdb = read_musicdb(&opts.musicdb_file)?;
 
-            let xwb_data = fs::read(&opts.xwb_file).with_context(|| {
-                format!(
-                    "failed to read XWB file {}",
-                    &opts.xwb_file.clone().display()
+            fs::create_dir_all(&opts.out_dir)?;
+
+            let mut pb = ProgressBar::new(musicdb.music.len().try_into()?);
+            for entry in musicdb.music {
+                pb.message(&format!("{} ", entry.basename));
+                pb.tick();
+
+                let mut ssq_file = opts.ssq_dir.clone();
+                ssq_file.push(&entry.basename);
+                ssq_file.set_extension("ssq");
+                let mut xwb_file = opts.xwb_dir.clone();
+                xwb_file.push(&entry.basename);
+                xwb_file.set_extension("xwb");
+                let mut out_file = opts.out_dir.clone();
+                out_file.push(format!("{} - {}.osz", entry.artist, entry.title));
+
+                let mut convert_options = opts.convert.clone();
+
+                convert_options.metadata.title = Some(entry.title.clone());
+                convert_options.metadata.artist = Some(entry.artist.clone());
+                convert_options.metadata.levels = Some(entry.diff_lv.clone());
+
+                ddr2osu(
+                    ssq_file,
+                    xwb_file,
+                    out_file,
+                    entry.basename.clone(),
+                    convert_options,
                 )
-            })?;
-            let wave_bank = WaveBank::parse(&xwb_data).context("failed to parse XWB file")?;
-
-            let audio_data = if wave_bank.sounds.contains_key(sound_name) {
-                wave_bank
-                    .sounds
-                    .get(sound_name)
-                    .unwrap()
-                    .to_wav()
-                    .with_context(|| {
-                        format!(
-                            "failed to convert wave bank sound entry “{}” to WAV",
-                            sound_name
-                        )
-                    })?
-            } else if wave_bank.sounds.len() == 2 {
-                warn!(
-                    "Sound {} not found in wave bank, but it has two entries; assuming these are preview and full song",
-                    sound_name
-                );
-                let mut sounds = wave_bank.sounds.values().collect::<Vec<&XWBSound>>();
-                sounds.sort_unstable_by(|a, b| b.size.cmp(&a.size));
-                sounds[0].to_wav().with_context(|| {
-                    format!(
-                        "failed to convert wave bank sound entry “{}” to WAV",
-                        sound_name
+                .unwrap_or_else(move |err| {
+                    error!(
+                        "Could not convert {} ({}), continuing anyway",
+                        entry.basename, err
                     )
-                })?
-            } else {
-                return Err(anyhow!(
-                    "Could not find matching sound in wave bank (searched for {})",
-                    sound_name,
-                ));
-            };
+                });
 
-            let osz = osu::osz::Archive {
-                beatmaps,
-                assets: vec![("audio.wav", &audio_data)],
-            };
-            osz.write(&opts.out_file).with_context(|| {
-                format!("failed to write OSZ file to {}", opts.out_file.display())
-            })?;
+                pb.inc();
+            }
         }
     }
     Ok(())
