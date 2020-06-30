@@ -427,7 +427,7 @@ fn main() -> Result<()> {
                 xwb_file.push(&entry.basename);
                 xwb_file.set_extension("xwb");
                 let mut out_file = opts.out_dir.clone();
-                out_file.push(format!("{} - {}.osz", entry.artist, entry.title));
+                out_file.push(format!("{} - {}.osz", entry.artist, entry.title).replace("/", "／"));
 
                 let mut convert_options = opts.convert.clone();
 
