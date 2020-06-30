@@ -45,7 +45,7 @@ enum SubCommand {
         about = "Converts DDR step charts to osu!mania beatmaps",
         display_order = 1
     )]
-    DDR2osu(DDR2osu),
+    DDR2osu(Box<DDR2osu>),
 }
 
 #[derive(Clap)]
@@ -89,7 +89,7 @@ struct DDR2osu {
         long = "xwb",
         name = "file.xwb",
         about = "XAC3 wave bank file",
-        display_order = 2
+        display_order = 1
     )]
     xwb_file: PathBuf,
     #[clap(
@@ -97,14 +97,22 @@ struct DDR2osu {
         long = "out",
         name = "file.osz",
         about = "osu! beatmap archive",
-        display_order = 3
+        display_order = 1
     )]
     out_file: PathBuf,
+    #[clap(
+        short = "m",
+        long = "musicdb",
+        name = "musicdb.xml|startup.arc",
+        about = "musicdb.xml or startup.arc for metadata",
+        display_order = 1
+    )]
+    musicdb_file: Option<PathBuf>,
     #[clap(
         short = "n",
         name = "sound name",
         about = "Sound in wave bank, otherwise inferred from SSQ filename",
-        display_order = 4
+        display_order = 2
     )]
     sound_name: Option<String>,
     #[clap(flatten)]
@@ -271,8 +279,29 @@ fn main() -> Result<()> {
                 .with_context(|| format!("failed to read SSQ file {}", &opts.ssq_file.display()))?;
             let ssq = SSQ::parse(&ssq_data).context("failed to parse SSQ file")?;
 
+            let mut convert_options = opts.convert.clone();
+
+            if let Some(musicdb_file) = &opts.musicdb_file {
+                debug!("Reading metadata from {}", musicdb_file.display());
+                let musicdb = read_musicdb(&musicdb_file)?;
+                let musicdb_entry = musicdb
+                    .get_entry_from_basename(sound_name)
+                    .ok_or_else(|| anyhow!("Entry not found in musicdb"))?;
+                if convert_options.metadata.title.is_none() {
+                    info!("Using title from musicdb: “{}”", musicdb_entry.title);
+                    convert_options.metadata.title = Some(musicdb_entry.title.clone());
+                }
+                if convert_options.metadata.artist.is_none() {
+                    info!("Using artist from musicdb: “{}”", musicdb_entry.artist);
+                    convert_options.metadata.artist = Some(musicdb_entry.artist.clone());
+                }
+                convert_options.metadata.levels = Some(musicdb_entry.diff_lv.clone());
+            } else if convert_options.metadata.title.is_none() {
+                convert_options.metadata.title = Some(sound_name.to_string());
+            }
+
             let beatmaps = ssq
-                .to_beatmaps(&opts.convert)
+                .to_beatmaps(&convert_options)
                 .context("failed to convert DDR step chart to osu!mania beatmap")?;
 
             let xwb_data = fs::read(&opts.xwb_file).with_context(|| {

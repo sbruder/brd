@@ -8,7 +8,7 @@ use log::{debug, info, trace, warn};
 use crate::ddr::ssq;
 use crate::osu::beatmap;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ConfigRange(f32, f32);
 
 impl ConfigRange {
@@ -35,7 +35,7 @@ impl FromStr for ConfigRange {
     }
 }
 
-#[derive(Debug, Clap)]
+#[derive(Debug, Clap, Clone)]
 pub struct Config {
     #[clap(skip = "audio.wav")]
     pub audio_filename: String,
@@ -43,7 +43,7 @@ pub struct Config {
         long = "no-stops",
         about = "Disable stops",
         parse(from_flag = std::ops::Not::not),
-        display_order = 5
+        display_order = 3
     )]
     pub stops: bool,
     #[clap(
@@ -51,7 +51,7 @@ pub struct Config {
         long,
         default_value = "step",
         about = "What to do with shocks",
-        display_order = 5
+        display_order = 3
     )]
     pub shock_action: ShockAction,
     #[clap(
@@ -70,19 +70,21 @@ pub struct Config {
     pub metadata: ConfigMetadata,
 }
 
-#[derive(Clap, Debug)]
+#[derive(Clap, Debug, Clone)]
 pub struct ConfigMetadata {
-    #[clap(long, about = "Song title to use in beatmap", display_order = 6)]
-    pub title: String,
-    #[clap(long, about = "Artist name to use in beatmap", display_order = 6)]
-    pub artist: String,
+    #[clap(long, about = "Song title to use in beatmap", display_order = 4)]
+    pub title: Option<String>,
+    #[clap(long, about = "Artist name to use in beatmap", display_order = 4)]
+    pub artist: Option<String>,
     #[clap(
         long,
         default_value = "Dance Dance Revolution",
         about = "Source to use in beatmap",
-        display_order = 6
+        display_order = 4
     )]
     pub source: String,
+    #[clap(skip)]
+    pub levels: Option<Vec<u8>>,
 }
 
 impl fmt::Display for Config {
@@ -336,10 +338,26 @@ impl ConvertedChart {
             },
             editor: beatmap::Editor {},
             metadata: beatmap::Metadata {
-                title: config.metadata.title.clone(),
-                artist: config.metadata.artist.clone(),
+                title: config
+                    .metadata
+                    .title
+                    .as_ref()
+                    .unwrap_or(&"unknown title".to_string())
+                    .clone(),
+                artist: config
+                    .metadata
+                    .artist
+                    .as_ref()
+                    .unwrap_or(&"unknown artist".to_string())
+                    .clone(),
                 creator: format!("{}", config),
-                version: format!("{}", self.difficulty),
+                version: match &config.metadata.levels {
+                    Some(levels) => {
+                        let level = self.difficulty.to_level(levels);
+                        format!("{} (Lv. {})", self.difficulty, level)
+                    }
+                    None => format!("{}", self.difficulty),
+                },
                 source: config.metadata.source.clone(),
                 tags: vec![],
             },

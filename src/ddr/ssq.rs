@@ -351,6 +351,26 @@ impl Into<f32> for Difficulty {
     }
 }
 
+/// Gets level for difficulty from [`ddr::musicdb::Entry.diff_lv`].
+///
+/// [`ddr::musicdb::Entry.diff_lv`]: ../musicdb/struct.Entry.html#structfield.diff_lv
+impl Difficulty {
+    pub fn to_level(&self, levels: &[u8]) -> u8 {
+        let base = match self.difficulty {
+            1 => 1,
+            2 => 2,
+            3 => 4,
+            4 => 0,
+            6 => 3,
+            _ => 4,
+        };
+
+        let index: usize = (base + (self.players - 1) * 5).into();
+
+        levels[index]
+    }
+}
+
 impl fmt::Display for Difficulty {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let players = match self.players {

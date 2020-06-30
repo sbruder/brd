@@ -92,4 +92,14 @@ impl MusicDB {
 
         Self::parse(&String::from_utf8(musicdb_data.to_vec())?).map_err(|err| err.into())
     }
+
+    pub fn get_entry_from_basename(&self, basename: &str) -> Option<&Entry> {
+        for entry in &self.music {
+            if entry.basename == basename {
+                return Some(entry);
+            }
+        }
+
+        None
+    }
 }

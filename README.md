@@ -19,7 +19,11 @@ This converts DDR step charts (.ssq files) and the corresponding audio (from
 
 Basic usage:
 
-    brd ddr2osu -s file.ssq -x file.xwb -o file.osz --title "Song Title" --artist "Song Artist"
+```shell
+brd ddr2osu -s file.ssq -x file.xwb -o file.osz --title "Song Title" --artist "Song Artist"
+# use musicdb from DDR A
+brd ddr2osu -s file.ssq -x file.xwb -o file.osz -m startup.arc
+```
 
 To learn more about supported options run `brd ddr2osu --help`
 
