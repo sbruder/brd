@@ -144,7 +144,7 @@ impl ShockStepGenerator {
     }
 }
 
-fn get_time_from_beats(beats: f32, tempo_changes: &[ssq::TempoChange]) -> Option<i32> {
+fn get_time_from_beats(beats: f32, tempo_changes: &[ssq::TempoChange]) -> Option<beatmap::Time> {
     for tempo_change in tempo_changes {
         // For TempoChanges that are infinitely short but exactly cover that beat, use the start
         // time of that TempoChange
@@ -157,7 +157,7 @@ fn get_time_from_beats(beats: f32, tempo_changes: &[ssq::TempoChange]) -> Option
         if beats < tempo_change.end_beats {
             return Some(
                 tempo_change.start_ms
-                    + ((beats - tempo_change.start_beats) * tempo_change.beat_length) as i32,
+                    + ((beats - tempo_change.start_beats) * tempo_change.beat_length) as u32,
             );
         }
     }

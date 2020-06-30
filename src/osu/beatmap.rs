@@ -10,7 +10,7 @@ pub type DecimalOsuPixel = f32;
 
 pub type SampleIndex = u16;
 
-pub type Time = i32;
+pub type Time = u32;
 
 // Helper functions
 fn bitflags(flags: [bool; 8]) -> u8 {

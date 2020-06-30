@@ -29,8 +29,8 @@ pub enum Error {
 
 /// Convert time offset to beats
 /// time offset is the measure times MEASURE_LENGTH
-fn measure_to_beats(metric: i32) -> f32 {
-    4.0 * metric as f32 / MEASURE_LENGTH
+fn measure_to_beats(measure: u32) -> f32 {
+    4.0 * measure as f32 / MEASURE_LENGTH
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -153,7 +153,7 @@ impl Row {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TempoChange {
-    pub start_ms: i32,
+    pub start_ms: u32,
     pub start_beats: f32,
     pub end_beats: f32,
     pub beat_length: f32,
@@ -163,7 +163,7 @@ pub struct TempoChange {
 pub struct TempoChanges(pub Vec<TempoChange>);
 
 impl TempoChanges {
-    fn parse(ticks_per_second: i32, data: &[u8]) -> Result<Self, Error> {
+    fn parse(ticks_per_second: u32, data: &[u8]) -> Result<Self, Error> {
         let mut cursor = Cursor::new(data);
 
         let count = cursor.read_u32::<LE>()?.try_into()?;
@@ -175,8 +175,8 @@ impl TempoChanges {
         let mut elapsed_ms = 0;
         let mut elapsed_beats = 0.0;
         for i in 1..count {
-            let delta_measure = measure[i] - measure[i - 1];
-            let delta_ticks = tempo_data[i] - tempo_data[i - 1];
+            let delta_measure: u32 = (measure[i] - measure[i - 1]).abs().try_into()?;
+            let delta_ticks: u32 = (tempo_data[i] - tempo_data[i - 1]).abs().try_into()?;
 
             let length_ms = 1000 * delta_ticks / ticks_per_second;
             let length_beats = measure_to_beats(delta_measure);
@@ -236,7 +236,7 @@ impl Chart {
         let mut freeze_steps = Vec::new();
 
         for step in 0..count {
-            let beats = measure_to_beats(measures[step]);
+            let beats = measure_to_beats(measures[step].try_into()?);
 
             // check if either all eight bits are set (shock for double) or the first four (shock for
             // single)
