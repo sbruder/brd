@@ -343,9 +343,9 @@ impl Into<f32> for Difficulty {
         match self.difficulty {
             1 => 0.25,
             2 => 0.5,
-            3 => 1.0,
+            3 => 0.75,
             4 => 0.0,
-            6 => 0.75,
+            6 => 1.0,
             _ => 1.0,
         }
     }
@@ -359,9 +359,9 @@ impl Difficulty {
         let base = match self.difficulty {
             1 => 1,
             2 => 2,
-            3 => 4,
+            3 => 3,
             4 => 0,
-            6 => 3,
+            6 => 4,
             _ => 4,
         };
 
