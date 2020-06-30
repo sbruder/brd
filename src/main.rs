@@ -118,6 +118,30 @@ fn get_basename(path: &PathBuf) -> Option<&str> {
     }
 }
 
+fn read_musicdb(path: &PathBuf) -> Result<musicdb::MusicDB> {
+    let extension = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
+
+    match extension {
+        "arc" => {
+            let arc_data = fs::read(path)
+                .with_context(|| format!("failed to read musicdb ARC file {}", path.display()))?;
+
+            musicdb::MusicDB::parse_from_startup_arc(&arc_data)
+                .context("failed to parse musicdb from ARC file")
+        }
+        _ => {
+            if extension != "xml" {
+                warn!("Did not find known extension (arc, xml), trying to parse as XML");
+            }
+
+            let musicdb_data = fs::read_to_string(path)
+                .with_context(|| format!("failed to read musicdb XML file {}", path.display()))?;
+
+            musicdb::MusicDB::parse(&musicdb_data).context("failed to parse musicdb XML")
+        }
+    }
+}
+
 fn main() -> Result<()> {
     pretty_env_logger::init();
 
@@ -190,32 +214,7 @@ fn main() -> Result<()> {
             }
         }
         SubCommand::MusicDB(opts) => {
-            let extension = opts
-                .file
-                .extension()
-                .and_then(|ext| ext.to_str())
-                .unwrap_or("");
-            let musicdb = match extension {
-                "arc" => {
-                    let arc_data = fs::read(&opts.file).with_context(|| {
-                        format!("failed to read musicdb ARC file {}", &opts.file.display())
-                    })?;
-
-                    musicdb::MusicDB::parse_from_startup_arc(&arc_data)
-                        .context("failed to parse musicdb from ARC file")?
-                }
-                _ => {
-                    if extension != "xml" {
-                        warn!("Did not find known extension (arc, xml), trying to parse as XML");
-                    }
-
-                    let musicdb_data = fs::read_to_string(&opts.file).with_context(|| {
-                        format!("failed to read musicdb XML file {}", &opts.file.display())
-                    })?;
-
-                    musicdb::MusicDB::parse(&musicdb_data).context("failed to parse musicdb XML")?
-                }
-            };
+            let musicdb = read_musicdb(&opts.file)?;
 
             let mut tw = TabWriter::new(io::stdout());
 
