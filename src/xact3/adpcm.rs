@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 use std::io::{Cursor, Write};
 
-use byteorder::{LittleEndian, WriteBytesExt};
+use byteorder::{WriteBytesExt, LE};
 use log::{debug, trace};
 use thiserror::Error;
 
@@ -45,23 +45,20 @@ impl WaveChunk for WaveFormat {
     fn to_chunk(&self) -> Vec<u8> {
         let mut buf = Cursor::new(Vec::new());
         write!(buf, "fmt ").unwrap();
-        buf.write_u32::<LittleEndian>(2 + 2 + 4 + 4 + 2 + 2 + 2 + 2 + 2 + 4 * COEFFS.len() as u32)
+        buf.write_u32::<LE>(2 + 2 + 4 + 4 + 2 + 2 + 2 + 2 + 2 + 4 * COEFFS.len() as u32)
             .unwrap();
-        buf.write_u16::<LittleEndian>(2).unwrap(); // WAVE_FORMAT_ADPCM
-        buf.write_u16::<LittleEndian>(self.n_channels).unwrap();
-        buf.write_u32::<LittleEndian>(self.n_samples_per_sec)
-            .unwrap();
-        buf.write_u32::<LittleEndian>(self.n_avg_bytes_per_sec)
-            .unwrap();
-        buf.write_u16::<LittleEndian>(self.n_block_align).unwrap();
-        buf.write_u16::<LittleEndian>(4).unwrap(); // wBitsPerSample
-        buf.write_u16::<LittleEndian>(32).unwrap(); // cbSize
-        buf.write_u16::<LittleEndian>(self.n_samples_per_block)
-            .unwrap();
-        buf.write_u16::<LittleEndian>(7).unwrap(); // wNumCoeff
+        buf.write_u16::<LE>(2).unwrap(); // WAVE_FORMAT_ADPCM
+        buf.write_u16::<LE>(self.n_channels).unwrap();
+        buf.write_u32::<LE>(self.n_samples_per_sec).unwrap();
+        buf.write_u32::<LE>(self.n_avg_bytes_per_sec).unwrap();
+        buf.write_u16::<LE>(self.n_block_align).unwrap();
+        buf.write_u16::<LE>(4).unwrap(); // wBitsPerSample
+        buf.write_u16::<LE>(32).unwrap(); // cbSize
+        buf.write_u16::<LE>(self.n_samples_per_block).unwrap();
+        buf.write_u16::<LE>(7).unwrap(); // wNumCoeff
         for coef_set in COEFFS {
-            buf.write_i16::<LittleEndian>(coef_set.0).unwrap();
-            buf.write_i16::<LittleEndian>(coef_set.1).unwrap();
+            buf.write_i16::<LE>(coef_set.0).unwrap();
+            buf.write_i16::<LE>(coef_set.1).unwrap();
         }
         buf.into_inner()
     }
@@ -75,8 +72,8 @@ impl WaveChunk for WaveFact {
     fn to_chunk(&self) -> Vec<u8> {
         let mut buf = Cursor::new(Vec::new());
         write!(buf, "fact").unwrap();
-        buf.write_u32::<LittleEndian>(4).unwrap();
-        buf.write_u32::<LittleEndian>(self.length_samples).unwrap();
+        buf.write_u32::<LE>(4).unwrap();
+        buf.write_u32::<LE>(self.length_samples).unwrap();
         buf.into_inner()
     }
 }
@@ -89,7 +86,7 @@ impl WaveChunk for RIFFHeader {
     fn to_chunk(&self) -> Vec<u8> {
         let mut buf = Cursor::new(Vec::new());
         write!(buf, "RIFF").unwrap();
-        buf.write_u32::<LittleEndian>(self.file_size).unwrap();
+        buf.write_u32::<LE>(self.file_size).unwrap();
         write!(buf, "WAVE").unwrap();
         buf.into_inner()
     }
@@ -123,7 +120,7 @@ pub fn build_wav(format: WaveFormat, data: &[u8]) -> Result<Vec<u8>, Error> {
     buf.write_all(&fact.to_chunk()).unwrap();
 
     write!(buf, "data").unwrap();
-    buf.write_u32::<LittleEndian>(length).unwrap();
+    buf.write_u32::<LE>(length).unwrap();
     buf.write_all(data).unwrap();
 
     Ok(buf.into_inner())
