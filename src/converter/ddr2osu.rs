@@ -284,10 +284,7 @@ impl ssq::Step {
                 }
             }
             ssq::Step::Shock { beats } => {
-                let columns = match shock_step_generator.next() {
-                    Some(columns) => columns,
-                    None => vec![],
-                };
+                let columns = shock_step_generator.next().unwrap_or_else(Vec::new);
 
                 for column in columns {
                     hit_objects.push(beatmap::HitObject::HitCircle {

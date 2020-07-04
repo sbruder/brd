@@ -166,13 +166,6 @@ struct BatchDDR2osu {
     convert: converter::ddr2osu::Config,
 }
 
-fn get_basename(path: &PathBuf) -> Option<&str> {
-    match path.file_stem() {
-        Some(stem) => stem.to_str(),
-        None => None,
-    }
-}
-
 fn read_musicdb(path: &PathBuf) -> Result<musicdb::MusicDB> {
     let extension = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
 
@@ -372,7 +365,10 @@ fn main() -> Result<()> {
         }
         SubCommand::DDR2osu(opts) => {
             let basename = opts.basename.clone().unwrap_or(
-                get_basename(&opts.ssq_file)
+                opts.ssq_file
+                    .file_stem()
+                    .map(|stem| stem.to_str())
+                    .flatten()
                     .map(|basename| basename.to_string())
                     .ok_or_else(|| {
                         anyhow!(
