@@ -1,7 +1,7 @@
-use std::ops::Deref;
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use derive_more::Deref;
 use quick_xml::de::{from_str, DeError};
 use serde::de;
 use serde::Deserialize;
@@ -24,7 +24,7 @@ pub enum Error {
 /// Type that implements [`serde::de::Deserialize`] for space separated lists in xml tag bodies.
 ///
 /// [`serde::de::Deserialize`]: ../../../serde/de/trait.Deserialize.html
-#[derive(Debug)]
+#[derive(Debug, Deref)]
 pub struct XMLList<T>(Vec<T>);
 
 impl<'de, T> serde::de::Deserialize<'de> for XMLList<T>
@@ -42,14 +42,6 @@ where
                 .map(|x| x.parse().map_err(de::Error::custom))
                 .collect::<Result<Vec<T>, _>>()?,
         ))
-    }
-}
-
-impl<T> Deref for XMLList<T> {
-    type Target = Vec<T>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
 

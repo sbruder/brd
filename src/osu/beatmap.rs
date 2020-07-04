@@ -1,6 +1,8 @@
+use std::fmt;
+
+use derive_more::{Deref, DerefMut};
 use num_derive::ToPrimitive;
 use num_traits::ToPrimitive;
-use std::fmt;
 
 use crate::utils;
 
@@ -165,7 +167,7 @@ impl fmt::Display for Difficulty {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deref)]
 pub struct Events(pub Vec<Event>);
 
 impl fmt::Display for Events {
@@ -176,7 +178,7 @@ impl fmt::Display for Events {
             [Events]\n\
             {}\n\
             ",
-            utils::join_display_values(self.0.clone(), "\n")
+            utils::join_display_values(self.to_vec(), "\n")
         )
     }
 }
@@ -226,7 +228,7 @@ impl fmt::Display for Event {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deref, DerefMut)]
 pub struct TimingPoints(pub Vec<TimingPoint>);
 
 impl fmt::Display for TimingPoints {
@@ -237,7 +239,7 @@ impl fmt::Display for TimingPoints {
             [TimingPoints]\n\
             {}\n\
             ",
-            utils::join_display_values(self.0.clone(), "\n")
+            utils::join_display_values(self.to_vec(), "\n")
         )
     }
 }
@@ -296,7 +298,7 @@ impl fmt::Display for TimingPoint {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deref)]
 pub struct Colours(pub Vec<Colour>);
 
 impl fmt::Display for Colours {
@@ -307,7 +309,7 @@ impl fmt::Display for Colours {
             [Colours]\n\
             {}\n\
             ",
-            utils::join_display_values(self.0.clone(), "\n")
+            utils::join_display_values(self.to_vec(), "\n")
         )
     }
 }
@@ -542,7 +544,7 @@ impl fmt::Display for HitObject {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deref, DerefMut)]
 pub struct HitObjects(pub Vec<HitObject>);
 
 impl fmt::Display for HitObjects {
@@ -553,7 +555,7 @@ impl fmt::Display for HitObjects {
             [HitObjects]\n\
             {}\n\
             ",
-            utils::join_display_values(self.0.clone(), "\n")
+            utils::join_display_values(self.to_vec(), "\n")
         )
     }
 }

@@ -144,8 +144,8 @@ impl ShockStepGenerator {
     }
 }
 
-fn get_time_from_beats(beats: f32, tempo_changes: &[ssq::TempoChange]) -> Option<beatmap::Time> {
-    for tempo_change in tempo_changes {
+fn get_time_from_beats(beats: f32, tempo_changes: &ssq::TempoChanges) -> Option<beatmap::Time> {
+    for tempo_change in tempo_changes.to_vec() {
         // For TempoChanges that are infinitely short but exactly cover that beat, use the start
         // time of that TempoChange
         if (beats - tempo_change.start_beats).abs() < 0.001
@@ -198,7 +198,7 @@ impl ssq::Step {
 
         match self {
             ssq::Step::Step { beats, row } => {
-                let time = get_time_from_beats(*beats, &tempo_changes.0);
+                let time = get_time_from_beats(*beats, tempo_changes);
 
                 match time {
                     Some(time) => {
@@ -236,8 +236,8 @@ impl ssq::Step {
                 }
             }
             ssq::Step::Freeze { start, end, row } => {
-                let time = get_time_from_beats(*start, &tempo_changes.0);
-                let end_time = get_time_from_beats(*end, &tempo_changes.0);
+                let time = get_time_from_beats(*start, tempo_changes);
+                let end_time = get_time_from_beats(*end, tempo_changes);
 
                 match (time, end_time) {
                     (Some(time), Some(end_time)) => {
@@ -290,7 +290,7 @@ impl ssq::Step {
                     hit_objects.push(beatmap::HitObject::HitCircle {
                         x: beatmap::column_to_x(column as u8, num_columns),
                         y: 192,
-                        time: get_time_from_beats(*beats, &tempo_changes.0)?,
+                        time: get_time_from_beats(*beats, tempo_changes)?,
                         hit_sound: beatmap::HitSound {
                             normal: true,
                             whistle: false,
@@ -378,18 +378,17 @@ impl ssq::SSQ {
     pub fn to_beatmaps(&self, config: &Config) -> Result<Vec<beatmap::Beatmap>> {
         debug!("Configuration: {:?}", config);
 
-        let mut timing_points = Vec::new();
+        let mut timing_points = beatmap::TimingPoints(Vec::new());
 
-        for entry in &self.tempo_changes.0 {
+        for entry in self.tempo_changes.to_vec() {
             if config.stops || entry.beat_length != f32::INFINITY {
                 trace!("Converting {:?} to to timing point", entry);
-                let timing_point: beatmap::TimingPoint = entry.clone().into();
-                timing_points.push(timing_point);
+                timing_points.push(entry.into());
             }
         }
         debug!(
             "Converted {} tempo changes to timing points",
-            self.tempo_changes.0.len()
+            self.tempo_changes.len()
         );
 
         let mut converted_charts = Vec::new();
@@ -407,19 +406,19 @@ impl ssq::SSQ {
                     &self.tempo_changes,
                     &mut shock_step_generator,
                 ) {
-                    hit_objects.0.append(&mut step_hit_objects);
+                    hit_objects.append(&mut step_hit_objects);
                 }
             }
 
             let converted_chart = ConvertedChart {
                 difficulty: chart.difficulty.clone(),
                 hit_objects,
-                timing_points: beatmap::TimingPoints(timing_points.clone()),
+                timing_points: timing_points.clone(),
             };
 
             debug!(
                 "Converted to beatmap with {} hit objects",
-                converted_chart.hit_objects.0.len(),
+                converted_chart.hit_objects.len(),
             );
 
             converted_charts.push(converted_chart);

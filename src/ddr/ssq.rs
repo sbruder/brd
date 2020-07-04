@@ -7,6 +7,7 @@ use std::io::Cursor;
 use std::num;
 
 use byteorder::{ReadBytesExt, LE};
+use derive_more::Deref;
 use log::{debug, info, trace, warn};
 use thiserror::Error;
 
@@ -159,7 +160,7 @@ pub struct TempoChange {
     pub beat_length: f32,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Deref, PartialEq)]
 pub struct TempoChanges(pub Vec<TempoChange>);
 
 impl TempoChanges {
