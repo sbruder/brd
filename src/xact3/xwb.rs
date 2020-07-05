@@ -65,18 +65,12 @@ impl TryInto<adpcm::WaveFormat> for Format {
             return Err(Error::UnsupportedFormat(self.tag));
         }
 
-        let n_block_align = (u16::from(self.alignment) + 22) * self.channels;
-        let n_samples_per_block =
-            (((n_block_align - (7 * self.channels)) * 8) / (4 * self.channels)) + 2;
-        let n_avg_bytes_per_sec =
-            (self.sample_rate / u32::from(n_samples_per_block)) * u32::from(n_block_align);
+        let block_align = (u16::from(self.alignment) + 22) * self.channels;
 
         Ok(adpcm::WaveFormat {
-            n_channels: self.channels,
-            n_samples_per_sec: self.sample_rate,
-            n_avg_bytes_per_sec,
-            n_block_align,
-            n_samples_per_block,
+            channels: self.channels,
+            sample_rate: self.sample_rate,
+            block_align,
         })
     }
 }
