@@ -137,6 +137,7 @@ impl Row {
                 (self_row1.into(), other_row1.into()),
                 (self_row2.into(), other_row2.into()),
             ],
+            // rows with different player count can’t intersect
             _ => vec![],
         };
 
@@ -339,16 +340,23 @@ impl From<u16> for Difficulty {
     }
 }
 
+impl Into<u8> for Difficulty {
+    fn into(self) -> u8 {
+        match self.difficulty {
+            1 => 1,
+            2 => 2,
+            3 => 3,
+            4 => 0,
+            6 => 4,
+            _ => 4,
+        }
+    }
+}
+
 impl Into<f32> for Difficulty {
     fn into(self) -> f32 {
-        match self.difficulty {
-            1 => 0.25,
-            2 => 0.5,
-            3 => 0.75,
-            4 => 0.0,
-            6 => 1.0,
-            _ => 1.0,
-        }
+        let difficulty: u8 = self.into();
+        f32::from(difficulty) / 4.0
     }
 }
 
@@ -357,14 +365,7 @@ impl Into<f32> for Difficulty {
 /// [`ddr::musicdb::Entry.diff_lv`]: ../musicdb/struct.Entry.html#structfield.diff_lv
 impl Difficulty {
     pub fn to_level(&self, levels: &[u8]) -> u8 {
-        let base = match self.difficulty {
-            1 => 1,
-            2 => 2,
-            3 => 3,
-            4 => 0,
-            6 => 4,
-            _ => 4,
-        };
+        let base: u8 = self.clone().into();
 
         let index: usize = (base + (self.players - 1) * 5).into();
 
@@ -451,7 +452,7 @@ mod tests {
     use quickcheck::TestResult;
 
     #[quickcheck]
-    fn test_ssq_row_new(columns: u8, players: u8) -> TestResult {
+    fn test_row_new(columns: u8, players: u8) -> TestResult {
         match players {
             1 | 2 => match (Row::new(columns, players), players) {
                 (Row::Single(..), 1) | (Row::Double(..), 2) => TestResult::passed(),
@@ -461,8 +462,78 @@ mod tests {
         }
     }
 
+    #[quickcheck]
+    fn test_row_intersects_itself(columns: u8, players: bool) -> bool {
+        let players = u8::from(players) + 1;
+        // only use first 4 bits for single player
+        let columns = if players == 1 {
+            columns & 0b1111
+        } else {
+            columns
+        };
+        let row = Row::new(columns, players);
+        let intersects = row.clone().intersects(row);
+        // Rows don’t intersect when all columns are unset
+        if columns == 0 {
+            !intersects
+        } else {
+            intersects
+        }
+    }
+
     #[test]
-    fn test_ssq_player_row() {
+    fn test_row_intersects() {
+        let values = [
+            (0b0010, 0b0011, 1),
+            (0b1000, 0b1000, 1),
+            (0b1111, 0b0100, 1),
+            (0b01010101, 0b11111111, 2),
+            (0b10000000, 0b10101010, 2),
+            (0b00100000, 0b00100000, 2),
+        ];
+        for (a, b, players) in values.iter() {
+            let row_a = Row::new(*a, *players);
+            let row_b = Row::new(*b, *players);
+            assert!(row_a.intersects(row_b));
+        }
+    }
+
+    #[test]
+    fn test_row_count_active() {
+        let values = [
+            (0b0000, 0, 1),
+            (0b0010, 1, 1),
+            (0b1010, 2, 1),
+            (0b1111, 4, 1),
+            (0b00000000, 0, 2),
+            (0b00001000, 1, 2),
+            (0b00000110, 2, 2),
+            (0b11111111, 8, 2),
+        ];
+        for (data, active, players) in values.iter() {
+            assert_eq!(Row::new(*data, *players).count_active(), *active);
+        }
+    }
+
+    #[test]
+    fn test_row_display() {
+        let values = [
+            (0b0000, "    ", 1),
+            (0b0010, " ↓  ", 1),
+            (0b1100, "  ↑→", 1),
+            (0b1111, "←↓↑→", 1),
+            (0b00000000, "         ", 2),
+            (0b00001000, "   →     ", 2),
+            (0b00000110, " ↓↑      ", 2),
+            (0b11111111, "←↓↑→ ←↓↑→", 2),
+        ];
+        for (data, displayed, players) in values.iter() {
+            assert_eq!(format!("{}", Row::new(*data, *players)), *displayed);
+        }
+    }
+
+    #[test]
+    fn test_player_row_parse() {
         assert_eq!(PlayerRow::from(0b11110000), PlayerRow::from(0b00000000));
         assert_eq!(
             PlayerRow::from(0b0001),
@@ -492,5 +563,94 @@ mod tests {
                 ..Default::default()
             }
         );
+    }
+
+    #[test]
+    fn test_measure_to_beats() {
+        assert_eq!(measure_to_beats(184832), 180.5);
+        assert_eq!(measure_to_beats(512), 0.5);
+    }
+
+    #[test]
+    fn test_difficuly_from_u16() {
+        let values = [(0b0000010000001000, 4, 2), (0b0000011000000100, 6, 1)];
+        for (data, difficulty, players) in values.iter() {
+            let diff = Difficulty::from(*data);
+            assert_eq!(diff.players, *players);
+            assert_eq!(diff.difficulty, *difficulty);
+        }
+    }
+
+    #[test]
+    fn test_difficulty_into() {
+        let sorted_difficulties: Vec<Difficulty> = vec![4, 1, 2, 3, 6]
+            .iter()
+            .map(|difficulty| Difficulty {
+                players: 1,
+                difficulty: *difficulty,
+            })
+            .collect();
+
+        let difficulties_u8: Vec<u8> = sorted_difficulties
+            .iter()
+            .map(|difficulty| difficulty.clone().into())
+            .collect();
+        for window in difficulties_u8.windows(2) {
+            assert_eq!(window.len(), 2);
+            assert!(dbg!(window[0]) < dbg!(window[1]));
+        }
+        for difficulty in &difficulties_u8 {
+            assert!(*difficulty <= 4);
+        }
+
+        let difficulties_f32: Vec<f32> = sorted_difficulties
+            .iter()
+            .map(|difficulty| difficulty.clone().into())
+            .collect();
+        for (i, difficulty) in difficulties_f32.iter().enumerate() {
+            assert_eq!((difficulty * 4.0) as u8, difficulties_u8[i]);
+        }
+    }
+
+    #[test]
+    fn test_difficulty_display() {
+        let values = [
+            ("Double Basic", 1, 2),
+            ("Single Difficult", 2, 1),
+            ("Double Expert", 3, 2),
+            ("Single Beginner", 4, 1),
+            ("Double Challenge", 6, 2),
+            ("Unknown Number of Players Unknown Difficulty", 5, 3),
+            ("Unknown Number of Players Unknown Difficulty", 7, 0),
+        ];
+        for (displayed, difficulty, players) in values.iter() {
+            assert_eq!(
+                format!(
+                    "{}",
+                    Difficulty {
+                        players: *players,
+                        difficulty: *difficulty,
+                    }
+                ),
+                *displayed
+            );
+        }
+    }
+
+    #[test]
+    fn test_difficulty_to_level() {
+        let levels: Vec<u8> = (1..=10).collect();
+        let mut last_level = 0;
+        for players in [1, 2].iter() {
+            for difficulty in [4, 1, 2, 3, 6].iter() {
+                let difficulty = Difficulty {
+                    players: *players,
+                    difficulty: *difficulty,
+                };
+                let level = difficulty.to_level(&levels);
+                assert!(last_level < level);
+                last_level = level;
+            }
+        }
     }
 }
