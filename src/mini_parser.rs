@@ -51,3 +51,33 @@ pub fn get_slice_range(slice: &[u8], range: Range<usize>) -> Result<&[u8], MiniP
         .into()
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[quickcheck]
+    fn test_read_string(string: String) -> bool {
+        let mut cursor = io::Cursor::new(&string);
+        cursor.read_string(string.len()).unwrap() == string.replace("\0", "")
+    }
+
+    #[quickcheck]
+    fn test_read_n_i32(nums: Vec<i32>) -> bool {
+        let mut cursor = io::Cursor::new(
+            nums.iter()
+                .flat_map(|num| num.to_le_bytes().to_vec())
+                .collect::<Vec<u8>>(),
+        );
+        cursor.read_n_i32(nums.len()).unwrap() == nums
+    }
+
+    #[test]
+    fn test_get_slice_range() {
+        let data = &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+        assert_eq!(get_slice_range(data, 0..6).unwrap(), &[0, 1, 2, 3, 4, 5]);
+        assert_eq!(get_slice_range(data, 7..10).unwrap(), &[7, 8, 9]);
+        get_slice_range(data, 5..15).unwrap_err();
+        get_slice_range(data, 20..25).unwrap_err();
+    }
+}
