@@ -14,7 +14,7 @@ pub type SampleIndex = u16;
 
 pub type Time = u32;
 
-fn assemble_hit_object_type(hit_object_type: u8, new_combo: bool, skip_combo_colours: U3) -> u8 {
+fn assemble_hit_object_type(hit_object_type: u8, new_combo: bool, skip_combo_colours: u8) -> u8 {
     let hit_object_type = 1u8 << hit_object_type;
     let new_combo = if new_combo { 0b0000_0010_u8 } else { 0u8 };
     let skip_combo_colours = (skip_combo_colours & 0b_0000_0111u8) << 1;
@@ -384,9 +384,6 @@ impl fmt::Display for HitSample {
     }
 }
 
-// Three bit integer
-pub type U3 = u8;
-
 #[derive(Clone)]
 pub enum HitObject {
     HitCircle {
@@ -395,7 +392,7 @@ pub enum HitObject {
         time: Time,
         hit_sound: HitSound,
         new_combo: bool,
-        skip_combo_colours: U3,
+        skip_combo_colours: u8,
         hit_sample: HitSample,
     },
     Slider {
@@ -404,7 +401,7 @@ pub enum HitObject {
         time: Time,
         hit_sound: HitSound,
         new_combo: bool,
-        skip_combo_colours: U3,
+        skip_combo_colours: u8,
         curve_type: char,
         curve_points: Vec<(DecimalOsuPixel, DecimalOsuPixel)>,
         slides: u8,
@@ -417,7 +414,7 @@ pub enum HitObject {
         time: Time,
         hit_sound: HitSound,
         new_combo: bool,
-        skip_combo_colours: U3,
+        skip_combo_colours: u8,
         end_time: Time,
         hit_sample: HitSample,
     },
@@ -427,7 +424,7 @@ pub enum HitObject {
         time: Time,
         hit_sound: HitSound,
         new_combo: bool,
-        skip_combo_colours: U3,
+        skip_combo_colours: u8,
         end_time: Time,
         hit_sample: HitSample,
     },
