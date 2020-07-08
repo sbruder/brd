@@ -12,8 +12,6 @@ pub fn byte_to_bitarray(byte: u8) -> [bool; 8] {
     bitarray
 }
 
-#[allow(dead_code)]
-/// Used to test `byte_to_bitarray`
 pub fn bitarray_to_byte(bitarray: [bool; 8]) -> u8 {
     bitarray
         .iter()

@@ -14,15 +14,6 @@ pub type SampleIndex = u16;
 
 pub type Time = u32;
 
-// Helper functions
-fn bitflags(flags: [bool; 8]) -> u8 {
-    let mut value = 0u8;
-    for (i, flag) in flags.iter().enumerate() {
-        value += ((0b1 as u8) << i) * (*flag as u8) as u8;
-    }
-    value
-}
-
 fn assemble_hit_object_type(hit_object_type: u8, new_combo: bool, skip_combo_colours: U3) -> u8 {
     let hit_object_type = 1u8 << hit_object_type;
     let new_combo = if new_combo { 0b0000_0010_u8 } else { 0u8 };
@@ -255,7 +246,7 @@ impl fmt::Display for TimingPointEffects {
         write!(
             f,
             "{}",
-            bitflags([
+            utils::bitarray_to_byte([
                 self.kiai_time,
                 false,
                 false,
@@ -360,7 +351,7 @@ impl fmt::Display for HitSound {
         write!(
             f,
             "{}",
-            bitflags([
+            utils::bitarray_to_byte([
                 self.normal,
                 self.whistle,
                 self.finish,
