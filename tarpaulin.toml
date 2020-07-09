@@ -1,0 +1,7 @@
+[default]
+ignore-tests = true
+target-dir = "target/tarpaulin/"
+exclude-files = ["target/*"]
+
+[report]
+out = ["Html"]
