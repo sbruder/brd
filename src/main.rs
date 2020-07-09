@@ -306,19 +306,23 @@ fn main() -> Result<()> {
                 .with_context(|| format!("failed to read ARC file {}", &opts.file.display()))?;
             let arc = ARC::parse(&arc_data).context("failed to parse ARC file")?;
 
-            let files = match opts.single_file {
-                Some(path) => match arc.files.get(&path) {
-                    Some(_) => vec![path],
-                    None => return Err(anyhow!("File “{}” not found in archive", path.display())),
-                },
-                None => arc.files.keys().cloned().collect(),
+            let files = match &opts.single_file {
+                Some(path) => {
+                    if arc.has_file(&path) {
+                        vec![path]
+                    } else {
+                        return Err(anyhow!("File “{}” not found in archive", path.display()));
+                    }
+                }
+                None => arc.file_paths(),
             };
 
-            for (path, data) in arc.files.iter() {
+            for path in arc.file_paths() {
                 if files.contains(&path) {
                     if opts.list_files {
                         println!("{}", path.display());
                     } else {
+                        let data = arc.get_file(path)?.unwrap();
                         info!("Writing {}", path.display());
                         if let Some(parent) = path.parent() {
                             fs::create_dir_all(parent)?;

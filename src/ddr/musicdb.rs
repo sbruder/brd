@@ -78,8 +78,7 @@ impl MusicDB {
         let arc = arc::ARC::parse(&data)?;
 
         let musicdb_data = arc
-            .files
-            .get(&PathBuf::from("data/gamedata/musicdb.xml"))
+            .get_file(&PathBuf::from("data/gamedata/musicdb.xml"))?
             .ok_or(Error::NotInArchive)?;
 
         Self::parse(&String::from_utf8(musicdb_data.to_vec())?).map_err(|err| err.into())
