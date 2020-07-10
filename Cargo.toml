@@ -16,6 +16,7 @@ num-traits = "0.2"
 pbr = "1.0.3"
 pretty_env_logger = "0.4"
 quick-xml = { version = "0.18", features = [ "serialize" ] }
+rayon = "1"
 serde = { version = "1.0", features = [ "derive" ] }
 tabwriter = "1.2.1"
 thiserror = "1.0.20"

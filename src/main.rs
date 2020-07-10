@@ -3,11 +3,13 @@ use std::fs;
 use std::io;
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use anyhow::{anyhow, Context, Result};
 use clap::Clap;
 use log::{debug, error, info, warn};
 use pbr::ProgressBar;
+use rayon::prelude::*;
 use tabwriter::TabWriter;
 
 use brd::converter;
@@ -415,10 +417,12 @@ fn main() -> Result<()> {
 
             fs::create_dir_all(&opts.out_dir)?;
 
-            let mut pb = ProgressBar::new(musicdb.music.len().try_into()?);
-            for entry in musicdb.music {
-                pb.message(&format!("{} ", entry.basename));
-                pb.tick();
+            let pb = Arc::new(Mutex::new(ProgressBar::new(
+                musicdb.music.len().try_into()?,
+            )));
+            musicdb.music.into_par_iter().for_each(|entry| {
+                pb.lock().unwrap().message(&format!("{} ", entry.basename));
+                pb.lock().unwrap().tick();
 
                 let mut ssq_file = opts.ssq_dir.clone();
                 ssq_file.push(&entry.basename);
@@ -449,8 +453,8 @@ fn main() -> Result<()> {
                     )
                 });
 
-                pb.inc();
-            }
+                pb.lock().unwrap().inc();
+            })
         }
     }
     Ok(())
