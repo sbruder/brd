@@ -466,6 +466,17 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_row_into_vec() {
+        let single: Vec<bool> = Row::new(0b0010, 1).unwrap().into();
+        let double: Vec<bool> = Row::new(0b01000000, 2).unwrap().into();
+        assert_eq!(single, vec![false, true, false, false]);
+        assert_eq!(
+            double,
+            vec![false, false, false, false, false, false, true, false]
+        );
+    }
+
     #[quickcheck]
     fn test_row_intersects_itself(columns: u8, players: bool) -> bool {
         let players = u8::from(players) + 1;
