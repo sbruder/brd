@@ -365,10 +365,10 @@ impl Into<f32> for Difficulty {
     }
 }
 
-/// Gets level for difficulty from [`ddr::musicdb::Entry.diff_lv`].
-///
-/// [`ddr::musicdb::Entry.diff_lv`]: ../musicdb/struct.Entry.html#structfield.diff_lv
 impl Difficulty {
+    /// Gets level for difficulty from [`ddr::musicdb::Entry.diff_lv`].
+    ///
+    /// [`ddr::musicdb::Entry.diff_lv`]: ../musicdb/struct.Entry.html#structfield.diff_lv
     pub fn to_level(&self, levels: &[u8]) -> u8 {
         let base: u8 = self.clone().into();
 
