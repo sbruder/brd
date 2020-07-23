@@ -488,17 +488,21 @@ mod tests {
     #[test]
     fn test_row_intersects() {
         let values = [
-            (0b0010, 0b0011, 1),
-            (0b1000, 0b1000, 1),
-            (0b1111, 0b0100, 1),
-            (0b01010101, 0b11111111, 2),
-            (0b10000000, 0b10101010, 2),
-            (0b00100000, 0b00100000, 2),
+            (0b0010, 0b0011, 1, true),
+            (0b1000, 0b1000, 1, true),
+            (0b1111, 0b0100, 1, true),
+            (0b0000, 0b1111, 1, false),
+            (0b1001, 0b0110, 1, false),
+            (0b01010101, 0b11111111, 2, true),
+            (0b10000000, 0b10101010, 2, true),
+            (0b00100000, 0b00100000, 2, true),
+            (0b00000000, 0b11111111, 2, false),
+            (0b01100000, 0b10000100, 2, false),
         ];
-        for (a, b, players) in values.iter() {
+        for (a, b, players, intersects) in values.iter() {
             let row_a = Row::new(*a, *players).unwrap();
             let row_b = Row::new(*b, *players).unwrap();
-            assert!(row_a.intersects(row_b));
+            assert_eq!(row_a.intersects(row_b), *intersects);
         }
     }
 
