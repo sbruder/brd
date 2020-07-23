@@ -58,6 +58,15 @@ Basic Usage:
     brd unxwb file.xwb
     brd unxwb -l file.xwb
 
+#### Known Problems
+
+ * It only supports sounds in [ADPCM][ADPCM] format. If you want to extract
+   sounds that are stored in other formats, you can use [Luigi Auriemma’s
+   unxwb][unxwb] (<kbd>Ctrl</kbd>+<kbd>F</kbd> unxwb).
+ * For wave banks without name entries it does not yet offer the option to read
+   the names from [XSB files][multimedia.cx-XSB] and currently generates the
+   names from the index in the file (starting from 0).
+
 ### unarc
 
 This can list and extract files from DDR A ARC archives. It extracts the
@@ -72,15 +81,6 @@ Basic Usage:
 
 This lists all entries from `musicdb.xml` or `startup.arc` files (only DDR A is
 supported).
-
-#### Known Problems
-
- * It only supports sounds in [ADPCM][ADPCM] format. If you want to extract
-   sounds that are stored in other formats, you can use [Luigi Auriemma’s
-   unxwb][unxwb] (<kbd>Ctrl</kbd>+<kbd>F</kbd> unxwb).
- * For wave banks without name entries it does not yet offer the option to read
-   the names from [XSB files][multimedia.cx-XSB] and currently generates the
-   names from the index in the file (starting from 0).
 
 ## About this project
 
