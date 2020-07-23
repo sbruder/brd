@@ -20,6 +20,8 @@ const MEASURE_LENGTH: f32 = 4096.0;
 pub enum Error {
     #[error("Not enough freeze data was found")]
     NotEnoughFreezeData,
+    #[error("Invalid player count {0} (valid options: 1, 2)")]
+    InvalidPlayerCount(u8),
     #[error(transparent)]
     IOError(#[from] io::Error),
     #[error(transparent)]
@@ -104,11 +106,14 @@ impl fmt::Display for Row {
 }
 
 impl Row {
-    fn new(byte: u8, players: u8) -> Self {
+    fn new(byte: u8, players: u8) -> Result<Self, Error> {
         match players {
-            1 => Self::Single(PlayerRow::from(byte)),
-            2 => Self::Double(PlayerRow::from(byte), PlayerRow::from(byte >> 4)),
-            _ => unreachable!(),
+            1 => Ok(Self::Single(PlayerRow::from(byte))),
+            2 => Ok(Self::Double(
+                PlayerRow::from(byte),
+                PlayerRow::from(byte >> 4),
+            )),
+            _ => Err(Error::InvalidPlayerCount(players)),
         }
     }
 
@@ -256,7 +261,7 @@ impl Chart {
                     // freeze end (start is the last normal step in that column)
                     trace!("Freeze arrow at {}", beats);
 
-                    let row = Row::new(columns, difficulty.players);
+                    let row = Row::new(columns, difficulty.players)?;
                     if row.count_active() != 1 {
                         warn!("Found freeze with not exactly one column, which is not implemented, skipping");
                         continue;
@@ -293,7 +298,7 @@ impl Chart {
 
                 parsed_steps.push(Step::Step {
                     beats,
-                    row: Row::new(steps[step], difficulty.players),
+                    row: Row::new(steps[step], difficulty.players)?,
                 });
             }
         }
@@ -453,12 +458,11 @@ mod tests {
 
     #[quickcheck]
     fn test_row_new(columns: u8, players: u8) -> TestResult {
-        match players {
-            1 | 2 => match (Row::new(columns, players), players) {
-                (Row::Single(..), 1) | (Row::Double(..), 2) => TestResult::passed(),
-                _ => TestResult::failed(),
-            },
-            _ => TestResult::must_fail(move || Row::new(columns, players)),
+        match (Row::new(columns, players), players) {
+            (Ok(Row::Single(..)), 1) => TestResult::passed(),
+            (Ok(Row::Double(..)), 2) => TestResult::passed(),
+            (Ok(Row::Single(..)), 2) | (Ok(Row::Double(..)), 1) => TestResult::failed(),
+            (row, _) => TestResult::from_bool(row.is_err()),
         }
     }
 
@@ -471,7 +475,7 @@ mod tests {
         } else {
             columns
         };
-        let row = Row::new(columns, players);
+        let row = Row::new(columns, players).unwrap();
         let intersects = row.clone().intersects(row);
         // Rows don’t intersect when all columns are unset
         if columns == 0 {
@@ -492,8 +496,8 @@ mod tests {
             (0b00100000, 0b00100000, 2),
         ];
         for (a, b, players) in values.iter() {
-            let row_a = Row::new(*a, *players);
-            let row_b = Row::new(*b, *players);
+            let row_a = Row::new(*a, *players).unwrap();
+            let row_b = Row::new(*b, *players).unwrap();
             assert!(row_a.intersects(row_b));
         }
     }
@@ -511,7 +515,7 @@ mod tests {
             (0b11111111, 8, 2),
         ];
         for (data, active, players) in values.iter() {
-            assert_eq!(Row::new(*data, *players).count_active(), *active);
+            assert_eq!(Row::new(*data, *players).unwrap().count_active(), *active);
         }
     }
 
@@ -528,7 +532,10 @@ mod tests {
             (0b11111111, "←↓↑→ ←↓↑→", 2),
         ];
         for (data, displayed, players) in values.iter() {
-            assert_eq!(format!("{}", Row::new(*data, *players)), *displayed);
+            assert_eq!(
+                format!("{}", Row::new(*data, *players).unwrap()),
+                *displayed
+            );
         }
     }
 
