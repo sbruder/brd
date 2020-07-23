@@ -504,6 +504,9 @@ mod tests {
             let row_b = Row::new(*b, *players).unwrap();
             assert_eq!(row_a.intersects(row_b), *intersects);
         }
+        assert!(!Row::new(0b1111, 1)
+            .unwrap()
+            .intersects(Row::new(0b1111, 2).unwrap()));
     }
 
     #[test]
