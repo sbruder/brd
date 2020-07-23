@@ -316,7 +316,7 @@ impl ssq::Step {
 }
 
 struct ConvertedChart {
-    difficulty: ssq::Difficulty,
+    level: ssq::Level,
     hit_objects: beatmap::HitObjects,
     timing_points: beatmap::TimingPoints,
 }
@@ -350,18 +350,18 @@ impl ConvertedChart {
                 creator: format!("{}", config),
                 version: match &config.metadata.levels {
                     Some(levels) => {
-                        let level = self.difficulty.to_level(levels);
-                        format!("{} (Lv. {})", self.difficulty, level)
+                        let level = self.level.to_value(levels);
+                        format!("{} (Lv. {})", self.level, level)
                     }
-                    None => format!("{}", self.difficulty),
+                    None => format!("{}", self.level),
                 },
                 source: config.metadata.source.clone(),
                 tags: vec![],
             },
             difficulty: beatmap::Difficulty {
-                hp_drain_rate: config.hp_drain.map_from(self.difficulty.clone().into()),
-                circle_size: f32::from(self.difficulty.players) * 4.0,
-                overall_difficulty: config.accuracy.map_from(self.difficulty.clone().into()),
+                hp_drain_rate: config.hp_drain.map_from(self.level.relative_difficulty()),
+                circle_size: f32::from(self.level.players) * 4.0,
+                overall_difficulty: config.accuracy.map_from(self.level.relative_difficulty()),
                 approach_rate: 8.0,
                 slider_multiplier: 0.64,
                 slider_tick_rate: 1.0,
@@ -411,7 +411,7 @@ impl ssq::SSQ {
             }
 
             let converted_chart = ConvertedChart {
-                difficulty: chart.difficulty.clone(),
+                level: chart.difficulty.clone(),
                 hit_objects,
                 timing_points: timing_points.clone(),
             };

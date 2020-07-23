@@ -1,5 +1,5 @@
 use std::convert::From;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::io;
 use std::io::prelude::*;
@@ -22,6 +22,8 @@ pub enum Error {
     NotEnoughFreezeData,
     #[error("Invalid player count {0} (valid options: 1, 2)")]
     InvalidPlayerCount(u8),
+    #[error("Invalid difficulty {0} (valid options: 4, 1, 2, 3, 6)")]
+    InvalidDifficulty(u8),
     #[error(transparent)]
     IOError(#[from] io::Error),
     #[error(transparent)]
@@ -216,13 +218,13 @@ pub enum Step {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Chart {
-    pub difficulty: Difficulty,
+    pub difficulty: Level,
     pub steps: Vec<Step>,
 }
 
 impl Chart {
     fn parse(data: &[u8], parameter: u16) -> Result<Self, Error> {
-        let difficulty: Difficulty = parameter.into();
+        let difficulty: Level = parameter.try_into()?;
 
         let mut cursor = Cursor::new(data);
 
@@ -330,55 +332,86 @@ impl Chart {
     }
 }
 
+/// Metadata about a level.
+///
+/// It does not store the level visible to the user. However it can – when povided with
+/// [`ddr::musicdb::Entry.diff_lv`] – return the user visible level with the [`to_value`] method.
+///
+/// [`ddr::musicdb::Entry.diff_lv`]: ../musicdb/struct.Entry.html#structfield.diff_lv
+/// [`to_value`]: #method.to_value
 #[derive(Clone, Debug, PartialEq)]
-pub struct Difficulty {
+pub struct Level {
     pub players: u8,
-    difficulty: u8,
+    pub difficulty: u8,
 }
 
-impl From<u16> for Difficulty {
-    fn from(parameter: u16) -> Self {
-        Self {
-            difficulty: ((parameter & 0xFF00) >> 8) as u8,
-            players: (parameter & 0xF) as u8 / 4,
+impl Level {
+    /// Creates a new instance and maps the SSQ difficulty to ordered difficulty.
+    ///
+    /// # Errors
+    ///
+    /// This checks if the players and difficulty and valid, otherwise it returns
+    /// [`InvalidPlayerCount`] or [`InvalidDifficulty`].
+    ///
+    /// [`InvalidPlayerCount`]: enum.Error.html#variant.InvalidPlayerCount
+    /// [`InvalidDifficulty`]: enum.Error.html#variant.InvalidDifficulty
+    pub fn new(players: u8, ssq_difficulty: u8) -> Result<Self, Error> {
+        if ![1, 2].contains(&players) {
+            return Err(Error::InvalidPlayerCount(players));
         }
+        let difficulty = Self::ssq_to_ordered(&ssq_difficulty)?;
+        Ok(Level {
+            players,
+            difficulty,
+        })
     }
-}
 
-impl Into<u8> for Difficulty {
-    fn into(self) -> u8 {
-        match self.difficulty {
+    /// The SSQ file stores the difficulty in a format, where the lower numeric value does not mean
+    /// the easier level. This function maps the values from the SSQ file to ordered values (lower
+    /// values → easier, higher values → harder)
+    ///
+    /// # Errors
+    ///
+    /// This checks if the difficulty is valid, otherwise it returns [`InvalidDifficulty`].
+    ///
+    /// [`InvalidDifficulty`]: enum.Error.html#variant.InvalidDifficulty
+    fn ssq_to_ordered(ssq_difficulty: &u8) -> Result<u8, Error> {
+        Ok(match ssq_difficulty {
+            4 => 0,
             1 => 1,
             2 => 2,
             3 => 3,
-            4 => 0,
             6 => 4,
-            _ => 4,
-        }
+            _ => return Err(Error::InvalidDifficulty(*ssq_difficulty)),
+        })
     }
-}
 
-impl Into<f32> for Difficulty {
-    fn into(self) -> f32 {
-        let difficulty: u8 = self.into();
-        f32::from(difficulty) / 4.0
+    /// Returns the difficulty as `f32` where 0.0 is the easiest and 1.0 is the hardest.
+    pub fn relative_difficulty(&self) -> f32 {
+        f32::from(self.difficulty) / 4.0
     }
-}
 
-impl Difficulty {
-    /// Gets level for difficulty from [`ddr::musicdb::Entry.diff_lv`].
+    /// Returns the user visible level value for difficulty from [`ddr::musicdb::Entry.diff_lv`].
     ///
     /// [`ddr::musicdb::Entry.diff_lv`]: ../musicdb/struct.Entry.html#structfield.diff_lv
-    pub fn to_level(&self, levels: &[u8]) -> u8 {
-        let base: u8 = self.clone().into();
-
-        let index: usize = (base + (self.players - 1) * 5).into();
+    pub fn to_value(&self, levels: &[u8]) -> u8 {
+        let index: usize = (self.difficulty + (self.players - 1) * 5).into();
 
         levels[index]
     }
 }
 
-impl fmt::Display for Difficulty {
+impl TryFrom<u16> for Level {
+    type Error = Error;
+
+    fn try_from(parameter: u16) -> Result<Self, Error> {
+        let players = (parameter & 0xF) as u8 / 4;
+        let difficulty = ((parameter & 0xFF00) >> 8) as u8;
+        Self::new(players, difficulty)
+    }
+}
+
+impl fmt::Display for Level {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let players = match self.players {
             1 => "Single",
@@ -432,7 +465,7 @@ impl SSQ {
                     ssq.tempo_changes = TempoChanges::parse(parameter.into(), &data)?;
                 }
                 3 => {
-                    debug!("Parsing step chunk ({})", Difficulty::from(parameter));
+                    debug!("Parsing step chunk ({})", Level::try_from(parameter)?);
                     ssq.charts.push(Chart::parse(&data, parameter)?)
                 }
                 _ => {
@@ -597,43 +630,48 @@ mod tests {
     }
 
     #[test]
-    fn test_difficuly_from_u16() {
-        let values = [(0b0000010000001000, 4, 2), (0b0000011000000100, 6, 1)];
-        for (data, difficulty, players) in values.iter() {
-            let diff = Difficulty::from(*data);
-            assert_eq!(diff.players, *players);
-            assert_eq!(diff.difficulty, *difficulty);
+    fn test_difficulty_ssq_to_ordered() {
+        let ssq_difficulties = vec![4, 1, 2, 3, 6];
+        let difficulties = ssq_difficulties
+            .iter()
+            .map(Level::ssq_to_ordered)
+            .map(|d| d.unwrap())
+            .collect::<Vec<u8>>();
+        // check if ordered ascending
+        for window in difficulties.windows(2) {
+            assert!(window[0] < window[1]);
         }
     }
 
     #[test]
-    fn test_difficulty_into() {
-        let sorted_difficulties: Vec<Difficulty> = vec![4, 1, 2, 3, 6]
-            .iter()
-            .map(|difficulty| Difficulty {
-                players: 1,
-                difficulty: *difficulty,
-            })
-            .collect();
+    fn test_difficuly_new() {
+        assert_eq!(Level::new(2, 4).unwrap().difficulty, 0);
+        assert!(Level::new(0, 0).is_err());
+        assert!(Level::new(4, 0).is_err());
+        assert!(Level::new(1, 5).is_err());
+        assert!(Level::new(1, 8).is_err());
+    }
 
-        let difficulties_u8: Vec<u8> = sorted_difficulties
-            .iter()
-            .map(|difficulty| difficulty.clone().into())
-            .collect();
-        for window in difficulties_u8.windows(2) {
-            assert_eq!(window.len(), 2);
-            assert!(dbg!(window[0]) < dbg!(window[1]));
-        }
-        for difficulty in &difficulties_u8 {
-            assert!(*difficulty <= 4);
-        }
+    #[test]
+    fn test_difficulty_relative() {
+        let mut difficulty = Level {
+            players: 1,
+            difficulty: 0,
+        };
+        assert_eq!(difficulty.relative_difficulty(), 0.0);
+        difficulty.difficulty = 2;
+        assert_eq!(difficulty.relative_difficulty(), 0.5);
+        difficulty.difficulty = 4;
+        assert_eq!(difficulty.relative_difficulty(), 1.0);
+    }
 
-        let difficulties_f32: Vec<f32> = sorted_difficulties
-            .iter()
-            .map(|difficulty| difficulty.clone().into())
-            .collect();
-        for (i, difficulty) in difficulties_f32.iter().enumerate() {
-            assert_eq!((difficulty * 4.0) as u8, difficulties_u8[i]);
+    #[test]
+    fn test_difficuly_from_u16() {
+        let values = [(0b0000010000001000, 0, 2), (0b0000011000000100, 4, 1)];
+        for (data, difficulty, players) in values.iter() {
+            let diff = Level::try_from(*data).unwrap();
+            assert_eq!(diff.players, *players);
+            assert_eq!(diff.difficulty, *difficulty);
         }
     }
 
@@ -652,7 +690,7 @@ mod tests {
             assert_eq!(
                 format!(
                     "{}",
-                    Difficulty {
+                    Level {
                         players: *players,
                         difficulty: *difficulty,
                     }
@@ -663,16 +701,13 @@ mod tests {
     }
 
     #[test]
-    fn test_difficulty_to_level() {
+    fn test_difficulty_to_value() {
         let levels: Vec<u8> = (1..=10).collect();
         let mut last_level = 0;
         for players in [1, 2].iter() {
             for difficulty in [4, 1, 2, 3, 6].iter() {
-                let difficulty = Difficulty {
-                    players: *players,
-                    difficulty: *difficulty,
-                };
-                let level = difficulty.to_level(&levels);
+                let difficulty = Level::new(*players, *difficulty).unwrap();
+                let level = difficulty.to_value(&levels);
                 assert!(last_level < level);
                 last_level = level;
             }
