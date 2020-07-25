@@ -419,11 +419,11 @@ impl fmt::Display for Level {
             _ => "Unknown Number of Players",
         };
         let difficulty = match self.difficulty {
+            0 => "Beginner",
             1 => "Basic",
             2 => "Difficult",
             3 => "Expert",
-            4 => "Beginner",
-            6 => "Challenge",
+            4 => "Challenge",
             _ => "Unknown Difficulty",
         };
         write!(f, "{} {}", players, difficulty)
@@ -678,11 +678,11 @@ mod tests {
     #[test]
     fn test_difficulty_display() {
         let values = [
+            ("Single Beginner", 0, 1),
             ("Double Basic", 1, 2),
             ("Single Difficult", 2, 1),
             ("Double Expert", 3, 2),
-            ("Single Beginner", 4, 1),
-            ("Double Challenge", 6, 2),
+            ("Double Challenge", 4, 2),
             ("Unknown Number of Players Unknown Difficulty", 5, 3),
             ("Unknown Number of Players Unknown Difficulty", 7, 0),
         ];
