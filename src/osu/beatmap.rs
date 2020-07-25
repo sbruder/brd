@@ -1,61 +1,130 @@
+//! The description format of an osu! beatmap.
+//!
+//! The beatmap file format is described in the [osu! knowledge base].
+//!
+//! Example (building a minimal beatmap):
+//!
+//! ```
+//! # use brd::osu::beatmap;
+//! let awesome_beatmap = beatmap::BeatmapBuilder::default()
+//!     .general(
+//!         beatmap::GeneralBuilder::default()
+//!             .audio_filename("audio.mp3")
+//!             .build()
+//!             .unwrap(),
+//!     )
+//!     .metadata(
+//!         beatmap::MetadataBuilder::default()
+//!             .title("My awesome song")
+//!             .artist("Awesome artist")
+//!             .creator("Me")
+//!             .version("Hard")
+//!             .source("Awesome songs vol.3")
+//!             .build()
+//!             .unwrap(),
+//!     )
+//!     .difficulty(
+//!         beatmap::DifficultyBuilder::default()
+//!             .hp_drain_rate(4.0)
+//!             .circle_size(4.0)
+//!             .overall_difficulty(3.0)
+//!             .approach_rate(8.0)
+//!             .slider_multiplier(0.64)
+//!             .slider_tick_rate(1.0)
+//!             .build()
+//!             .unwrap(),
+//!     )
+//!     .timing_points(beatmap::TimingPoints(vec![
+//!         beatmap::TimingPointBuilder::default()
+//!             .time(0)
+//!             .beat_length(1000.0 / 3.0)
+//!             .build()
+//!             .unwrap(),
+//!     ]))
+//!     .hit_objects(beatmap::HitObjects(vec![
+//!         beatmap::hit_object::HitCircleBuilder::default()
+//!             .x(256)
+//!             .y(192)
+//!             .time(8000)
+//!             .build()
+//!             .unwrap()
+//!             .into(),
+//!     ]))
+//!     .build()
+//!     .unwrap();
+//!
+//! assert_eq!(
+//!     format!("{}", awesome_beatmap),
+//!     r#"osu file format v14
+//!
+//! [General]
+//! AudioFilename: audio.mp3
+//! AudioLeadIn: 0
+//! PreviewTime: -1
+//! Countdown: 1
+//! SampleSet: Normal
+//! Mode: 0
+//!
+//! [Editor]
+//!
+//! [Metadata]
+//! Title:My awesome song
+//! Artist:Awesome artist
+//! Creator:Me
+//! Version:Hard
+//! Source:Awesome songs vol.3
+//! Tags:
+//!
+//! [Difficulty]
+//! HPDrainRate:4
+//! CircleSize:4
+//! OverallDifficulty:3
+//! ApproachRate:8
+//! SliderMultiplier:0.64
+//! SliderTickRate:1
+//!
+//! [Events]
+//!
+//!
+//! [TimingPoints]
+//! 0,333.33334,4,0,0,100,1,0
+//!
+//! [Colours]
+//!
+//!
+//! [HitObjects]
+//! 256,192,8000,1,0,0:0:0:0:
+//! "#
+//! );
+//! ```
+//!
+//! [osu! knowledge base]: https://osu.ppy.sh/help/wiki/osu!_File_Formats/Osu_(file_format)
+pub mod hit_object;
+pub use hit_object::HitObject;
+
 use std::fmt;
 
+use derive_builder::Builder;
 use derive_more::{Deref, DerefMut};
-use num_derive::ToPrimitive;
 use num_traits::ToPrimitive;
 
+use super::types::*;
 use crate::utils;
 
-// Generic Type Aliases
-pub type OsuPixel = i16;
-pub type DecimalOsuPixel = f32;
-
-pub type SampleIndex = u16;
-
-pub type Time = u32;
-
-fn assemble_hit_object_type(hit_object_type: u8, new_combo: bool, skip_combo_colours: u8) -> u8 {
-    let hit_object_type = 1u8 << hit_object_type;
-    let new_combo = if new_combo { 0b0000_0010_u8 } else { 0u8 };
-    let skip_combo_colours = (skip_combo_colours & 0b_0000_0111u8) << 1;
-    hit_object_type + new_combo + skip_combo_colours
-}
-
-pub fn column_to_x(column: u8, columns: u8) -> OsuPixel {
-    (512 * OsuPixel::from(column) + 256) / OsuPixel::from(columns)
-}
-
-#[derive(ToPrimitive, Clone)]
-pub enum Countdown {
-    No = 0,
-    Normal = 1,
-    Half = 2,
-    Double = 3,
-}
-
-#[derive(ToPrimitive, Clone)]
-pub enum Mode {
-    Normal = 0,
-    Taiko = 1,
-    Catch = 2,
-    Mania = 3,
-}
-
-#[derive(ToPrimitive, Debug, Clone)]
-pub enum SampleSet {
-    BeatmapDefault = 0,
-    Normal = 1,
-    Soft = 2,
-    Drum = 3,
-}
-
-#[derive(Clone)]
+#[derive(Builder, Clone)]
 pub struct General {
+    #[builder(setter(into))]
     pub audio_filename: String,
+    #[builder(default)]
     pub audio_lead_in: Time,
-    pub preview_time: Time,
+    #[builder(default = "-1")]
+    pub preview_time: SignedTime,
+    #[builder(default)]
     pub countdown: Countdown,
+    // SampleSet’s normal default (BeatmapDefault) does not make sense here
+    #[builder(default = "SampleSet::Normal")]
     pub sample_set: SampleSet,
+    #[builder(default)]
     pub mode: Mode,
 }
 
@@ -82,8 +151,8 @@ impl fmt::Display for General {
     }
 }
 
-#[derive(Clone)]
-pub struct Editor {/* stub */}
+#[derive(Clone, Default)]
+pub struct Editor;
 
 impl fmt::Display for Editor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -91,13 +160,17 @@ impl fmt::Display for Editor {
     }
 }
 
-#[derive(Clone)]
+#[derive(Builder, Clone)]
+#[builder(setter(into))]
 pub struct Metadata {
     pub title: String,
     pub artist: String,
+    #[builder(default = "\"brd::osu\".to_string()")]
     pub creator: String,
     pub version: String,
+    #[builder(default)]
     pub source: String,
+    #[builder(default)]
     pub tags: Vec<String>,
 }
 
@@ -124,15 +197,44 @@ impl fmt::Display for Metadata {
     }
 }
 
-#[derive(Clone)]
+#[derive(Builder, Clone, Debug)]
+#[builder(build_fn(validate = "Self::validate"))]
 pub struct Difficulty {
-    pub hp_drain_rate: f32,
+    #[builder(setter(into))]
+    pub hp_drain_rate: RangeSetting,
     /// Also is the number of keys in mania
-    pub circle_size: f32,
-    pub overall_difficulty: f32,
-    pub approach_rate: f32,
+    #[builder(setter(into))]
+    pub circle_size: RangeSetting,
+    #[builder(setter(into))]
+    pub overall_difficulty: RangeSetting,
+    #[builder(setter(into))]
+    pub approach_rate: RangeSetting,
     pub slider_multiplier: f32,
     pub slider_tick_rate: f32,
+}
+
+impl DifficultyBuilder {
+    fn validate_option(maybe_value: &Option<RangeSetting>, name: &str) -> Result<(), String> {
+        if let Some(value) = maybe_value {
+            if !value.validate() {
+                return Err(format!(
+                    "{} has to be between {} and {}",
+                    name,
+                    RangeSetting::MIN,
+                    RangeSetting::MAX
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        Self::validate_option(&self.hp_drain_rate, "hp_drain_rate")?;
+        Self::validate_option(&self.circle_size, "circle_size")?;
+        Self::validate_option(&self.overall_difficulty, "overall_difficulty")?;
+        Self::validate_option(&self.approach_rate, "approach_rate")?;
+        Ok(())
+    }
 }
 
 impl fmt::Display for Difficulty {
@@ -158,7 +260,7 @@ impl fmt::Display for Difficulty {
     }
 }
 
-#[derive(Clone, Deref)]
+#[derive(Clone, Default, Deref, DerefMut)]
 pub struct Events(pub Vec<Event>);
 
 impl fmt::Display for Events {
@@ -174,7 +276,7 @@ impl fmt::Display for Events {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Event {
     Background {
         filename: String,
@@ -182,8 +284,8 @@ pub enum Event {
         y_offset: OsuPixel,
     },
     Video {
-        start_time: Time,
         filename: String,
+        start_time: Time,
         x_offset: OsuPixel,
         y_offset: OsuPixel,
     },
@@ -219,7 +321,7 @@ impl fmt::Display for Event {
     }
 }
 
-#[derive(Clone, Deref, DerefMut)]
+#[derive(Clone, Default, Deref, DerefMut)]
 pub struct TimingPoints(pub Vec<TimingPoint>);
 
 impl fmt::Display for TimingPoints {
@@ -235,7 +337,7 @@ impl fmt::Display for TimingPoints {
     }
 }
 
-#[derive(Clone)]
+#[derive(Builder, Clone, Default)]
 pub struct TimingPointEffects {
     pub kiai_time: bool,
     pub omit_first_barline: bool,
@@ -260,15 +362,21 @@ impl fmt::Display for TimingPointEffects {
     }
 }
 
-#[derive(Clone)]
+#[derive(Builder, Clone)]
 pub struct TimingPoint {
     pub time: Time,
     pub beat_length: f32,
+    #[builder(default = "4")]
     pub meter: u8,
+    #[builder(default = "SampleSet::BeatmapDefault")]
     pub sample_set: SampleSet,
-    pub sample_index: SampleIndex,
+    #[builder(default = "0")]
+    pub sample_index: u32,
+    #[builder(default = "100")]
     pub volume: u8,
+    #[builder(default = "true")]
     pub uninherited: bool,
+    #[builder(default)]
     pub effects: TimingPointEffects,
 }
 
@@ -289,7 +397,7 @@ impl fmt::Display for TimingPoint {
     }
 }
 
-#[derive(Clone, Deref)]
+#[derive(Clone, Default, Deref, DerefMut)]
 pub struct Colours(pub Vec<Colour>);
 
 impl fmt::Display for Colours {
@@ -321,7 +429,7 @@ impl fmt::Display for ColourScope {
     }
 }
 
-#[derive(Clone)]
+#[derive(Builder, Clone)]
 pub struct Colour {
     pub scope: ColourScope,
     pub colour: [u8; 3],
@@ -336,14 +444,6 @@ impl fmt::Display for Colour {
             utils::join_display_values(self.colour.to_vec(), ",")
         )
     }
-}
-
-#[derive(Clone)]
-pub struct HitSound {
-    pub normal: bool,
-    pub whistle: bool,
-    pub finish: bool,
-    pub clap: bool,
 }
 
 impl fmt::Display for HitSound {
@@ -365,174 +465,21 @@ impl fmt::Display for HitSound {
     }
 }
 
-#[derive(Clone)]
-pub struct HitSample {
-    pub normal_set: SampleIndex,
-    pub addition_set: SampleIndex,
-    pub index: SampleIndex,
-    pub volume: u8,
-    pub filename: String,
-}
-
 impl fmt::Display for HitSample {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
             "{}:{}:{}:{}:{}",
-            self.normal_set, self.addition_set, self.index, self.volume, self.filename
+            ToPrimitive::to_u8(&self.normal_set).unwrap(),
+            ToPrimitive::to_u8(&self.addition_set).unwrap(),
+            self.index,
+            self.volume,
+            self.filename
         )
     }
 }
 
-#[derive(Clone)]
-pub enum HitObject {
-    HitCircle {
-        x: OsuPixel,
-        y: OsuPixel,
-        time: Time,
-        hit_sound: HitSound,
-        new_combo: bool,
-        skip_combo_colours: u8,
-        hit_sample: HitSample,
-    },
-    Slider {
-        x: OsuPixel,
-        y: OsuPixel,
-        time: Time,
-        hit_sound: HitSound,
-        new_combo: bool,
-        skip_combo_colours: u8,
-        curve_type: char,
-        curve_points: Vec<(DecimalOsuPixel, DecimalOsuPixel)>,
-        slides: u8,
-        length: DecimalOsuPixel,
-        edge_sounds: Vec<SampleIndex>,
-        edge_sets: Vec<(SampleSet, SampleSet)>,
-        hit_sample: HitSample,
-    },
-    Spinner {
-        time: Time,
-        hit_sound: HitSound,
-        new_combo: bool,
-        skip_combo_colours: u8,
-        end_time: Time,
-        hit_sample: HitSample,
-    },
-    Hold {
-        column: u8,
-        columns: u8,
-        time: Time,
-        hit_sound: HitSound,
-        new_combo: bool,
-        skip_combo_colours: u8,
-        end_time: Time,
-        hit_sample: HitSample,
-    },
-}
-
-impl fmt::Display for HitObject {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            HitObject::HitCircle {
-                x,
-                y,
-                time,
-                hit_sound,
-                new_combo,
-                skip_combo_colours,
-                hit_sample,
-            } => write!(
-                f,
-                "{},{},{},{},{},{}",
-                x,
-                y,
-                time,
-                assemble_hit_object_type(0, *new_combo, *skip_combo_colours),
-                hit_sound,
-                hit_sample
-            ),
-            HitObject::Slider {
-                x,
-                y,
-                time,
-                hit_sound,
-                new_combo,
-                skip_combo_colours,
-                curve_type,
-                curve_points,
-                slides,
-                length,
-                edge_sounds,
-                edge_sets,
-                hit_sample,
-            } => write!(
-                f,
-                "{},{},{},{},{},{}|{},{},{},{},{},{}",
-                x,
-                y,
-                time,
-                assemble_hit_object_type(1, *new_combo, *skip_combo_colours),
-                hit_sound,
-                curve_type,
-                curve_points
-                    .iter()
-                    .map(|point| format!("{}:{}", point.0, point.1))
-                    .collect::<Vec<_>>()
-                    .join("|"),
-                slides,
-                length,
-                utils::join_display_values(edge_sounds.clone(), "|"),
-                edge_sets
-                    .iter()
-                    .map(|set| format!(
-                        "{}:{}",
-                        ToPrimitive::to_u16(&set.0).unwrap(),
-                        ToPrimitive::to_u16(&set.1).unwrap()
-                    ))
-                    .collect::<Vec<_>>()
-                    .join("|"),
-                hit_sample
-            ),
-            HitObject::Spinner {
-                time,
-                hit_sound,
-                new_combo,
-                skip_combo_colours,
-                end_time,
-                hit_sample,
-            } => write!(
-                f,
-                "256,192,{},{},{},{},{}",
-                time,
-                assemble_hit_object_type(3, *new_combo, *skip_combo_colours),
-                hit_sound,
-                end_time,
-                hit_sample
-            ),
-            HitObject::Hold {
-                column,
-                columns,
-                time,
-                hit_sound,
-                new_combo,
-                skip_combo_colours,
-                end_time,
-                hit_sample,
-            } => write!(
-                f,
-                "{},192,{},{},{},{}:{}",
-                column_to_x(*column, *columns),
-                time,
-                assemble_hit_object_type(7, *new_combo, *skip_combo_colours),
-                hit_sound,
-                end_time,
-                hit_sample
-            ),
-        }
-    }
-}
-
-#[derive(Clone, Deref, DerefMut)]
+#[derive(Clone, Default, Deref, DerefMut)]
 pub struct HitObjects(pub Vec<HitObject>);
 
 impl fmt::Display for HitObjects {
@@ -548,14 +495,19 @@ impl fmt::Display for HitObjects {
     }
 }
 
+#[derive(Builder)]
 pub struct Beatmap {
+    #[builder(default = "14")]
     pub version: u8,
     pub general: General,
+    #[builder(default)]
     pub editor: Editor,
     pub metadata: Metadata,
     pub difficulty: Difficulty,
+    #[builder(default)]
     pub events: Events,
     pub timing_points: TimingPoints,
+    #[builder(default)]
     pub colours: Colours,
     pub hit_objects: HitObjects,
 }
@@ -564,7 +516,7 @@ impl fmt::Display for Beatmap {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "osu file format v{}\n\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n",
+            "osu file format v{}\n\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}",
             self.version,
             self.general.clone(),
             self.editor.clone(),
@@ -575,5 +527,277 @@ impl fmt::Display for Beatmap {
             self.colours.clone(),
             self.hit_objects.clone()
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn general() {
+        let general = GeneralBuilder::default()
+            .audio_filename("foo.mp3")
+            .audio_lead_in(23)
+            .preview_time(5000)
+            .countdown(Countdown::Double)
+            .sample_set(SampleSet::Drum)
+            .mode(Mode::Mania)
+            .build()
+            .unwrap();
+        assert_eq!(
+            format!("{}", general),
+            "[General]\n\
+            AudioFilename: foo.mp3\n\
+            AudioLeadIn: 23\n\
+            PreviewTime: 5000\n\
+            Countdown: 3\n\
+            SampleSet: Drum\n\
+            Mode: 3\n",
+        )
+    }
+
+    #[test]
+    fn editor() {
+        assert_eq!(format!("{}", Editor), "[Editor]\n");
+    }
+
+    #[test]
+    fn metadata() {
+        let metadata = MetadataBuilder::default()
+            .title("Song Title")
+            .artist("Song Artist")
+            .creator("mycoolusername42")
+            .version("Super Hard")
+            .source("Best Hits Vol. 23")
+            .tags(vec![
+                "some".to_string(),
+                "descriptive".to_string(),
+                "tags".to_string(),
+            ])
+            .build()
+            .unwrap();
+        assert_eq!(
+            format!("{}", metadata),
+            "[Metadata]\n\
+            Title:Song Title\n\
+            Artist:Song Artist\n\
+            Creator:mycoolusername42\n\
+            Version:Super Hard\n\
+            Source:Best Hits Vol. 23\n\
+            Tags:some descriptive tags\n"
+        );
+    }
+
+    #[test]
+    fn dificulty_builder_error() {
+        assert_eq!(
+            DifficultyBuilder::default()
+                .hp_drain_rate(25.0)
+                .circle_size(5.0)
+                .overall_difficulty(5.0)
+                .approach_rate(5.0)
+                .build()
+                .unwrap_err(),
+            "hp_drain_rate has to be between 0 and 10"
+        );
+    }
+
+    #[test]
+    fn difficulty() {
+        let difficulty = DifficultyBuilder::default()
+            .hp_drain_rate(4.0)
+            .circle_size(5.0)
+            .overall_difficulty(6.0)
+            .approach_rate(7.0)
+            .slider_multiplier(0.64)
+            .slider_tick_rate(1.0)
+            .build()
+            .unwrap();
+        assert_eq!(
+            format!("{}", difficulty),
+            "[Difficulty]\n\
+            HPDrainRate:4\n\
+            CircleSize:5\n\
+            OverallDifficulty:6\n\
+            ApproachRate:7\n\
+            SliderMultiplier:0.64\n\
+            SliderTickRate:1\n"
+        )
+    }
+
+    #[test]
+    fn events() {
+        let mut events = Events(Vec::new());
+        events.push(Event::Background {
+            filename: "foo.jpg".to_string(),
+            x_offset: 42.into(),
+            y_offset: 23.into(),
+        });
+        events.push(Event::Video {
+            filename: "foo.mp4".to_string(),
+            start_time: 500,
+            x_offset: 42.into(),
+            y_offset: 23.into(),
+        });
+        events.push(Event::Break {
+            start_time: 23000,
+            end_time: 42000,
+        });
+        assert_eq!(
+            format!("{}", events),
+            "[Events]\n\
+            0,0,foo.jpg,42,23\n\
+            Video,500,foo.mp4,42,23\n\
+            Break,23000,42000\n"
+        )
+    }
+
+    #[test]
+    fn timing_points() {
+        let mut timing_points = TimingPoints(Vec::new());
+        timing_points.push(
+            TimingPointBuilder::default()
+                .time(0)
+                .beat_length(1000.0 / 3.0)
+                .build()
+                .unwrap(),
+        );
+        timing_points.push(
+            TimingPointBuilder::default()
+                .time(5000)
+                .beat_length(500.0)
+                .meter(8)
+                .sample_set(SampleSet::Drum)
+                .sample_index(1)
+                .volume(50)
+                .uninherited(false)
+                .effects(
+                    TimingPointEffectsBuilder::default()
+                        .kiai_time(true)
+                        .omit_first_barline(true)
+                        .build()
+                        .unwrap(),
+                )
+                .build()
+                .unwrap(),
+        );
+        assert_eq!(
+            format!("{}", timing_points),
+            "[TimingPoints]\n\
+            0,333.33334,4,0,0,100,1,0\n\
+            5000,500,8,3,1,50,0,9\n"
+        );
+    }
+
+    #[test]
+    fn colours() {
+        let mut colours = Colours::default();
+        colours.push(
+            ColourBuilder::default()
+                .scope(ColourScope::Combo(42))
+                .colour([0, 127, 255])
+                .build()
+                .unwrap(),
+        );
+        colours.push(
+            ColourBuilder::default()
+                .scope(ColourScope::SliderTrackOverride)
+                .colour([127, 255, 0])
+                .build()
+                .unwrap(),
+        );
+        colours.push(
+            ColourBuilder::default()
+                .scope(ColourScope::SliderBorder)
+                .colour([255, 0, 127])
+                .build()
+                .unwrap(),
+        );
+        assert_eq!(
+            format!("{}", colours),
+            "[Colours]\n\
+            Combo42 : 0,127,255\n\
+            SliderTrackOverride : 127,255,0\n\
+            SliderBorder : 255,0,127\n"
+        )
+    }
+
+    #[test]
+    fn hit_sound() {
+        assert_eq!(format!("{}", HitSound::default()), "0");
+        assert_eq!(
+            format!(
+                "{}",
+                HitSoundBuilder::default().normal(true).build().unwrap()
+            ),
+            "1"
+        );
+        assert_eq!(
+            format!(
+                "{}",
+                HitSoundBuilder::default().whistle(true).build().unwrap()
+            ),
+            "2"
+        );
+        assert_eq!(
+            format!(
+                "{}",
+                HitSoundBuilder::default().finish(true).build().unwrap()
+            ),
+            "4"
+        );
+        assert_eq!(
+            format!("{}", HitSoundBuilder::default().clap(true).build().unwrap()),
+            "8"
+        );
+    }
+
+    #[test]
+    fn hit_sample() {
+        assert_eq!(format!("{}", HitSample::default()), "0:0:0:0:");
+        assert_eq!(
+            format!(
+                "{}",
+                HitSampleBuilder::default()
+                    .normal_set(SampleSet::Drum)
+                    .addition_set(SampleSet::Normal)
+                    .index(23)
+                    .volume(42)
+                    .filename("foo.mp3")
+                    .build()
+                    .unwrap()
+            ),
+            "3:1:23:42:foo.mp3"
+        );
+    }
+
+    #[test]
+    fn hit_objects() {
+        let mut hit_objects: HitObjects = Default::default();
+        hit_objects.push(
+            hit_object::HitCircleBuilder::default()
+                .x(200)
+                .y(400)
+                .time(5732)
+                .build()
+                .unwrap()
+                .into(),
+        );
+        hit_objects.push(
+            hit_object::HitCircleBuilder::default()
+                .x(400)
+                .y(500)
+                .time(7631)
+                .build()
+                .unwrap()
+                .into(),
+        );
+        assert_eq!(
+            format!("{}", hit_objects),
+            "[HitObjects]\n\
+            200,400,5732,1,0,0:0:0:0:\n\
+            400,500,7631,1,0,0:0:0:0:\n"
+        );
     }
 }

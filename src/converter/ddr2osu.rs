@@ -7,6 +7,7 @@ use log::{debug, info, trace, warn};
 
 use crate::ddr::ssq;
 use crate::osu::beatmap;
+use crate::osu::types::*;
 
 #[derive(Clone, Debug)]
 pub struct ConfigRange(f32, f32);
@@ -144,7 +145,7 @@ impl ShockStepGenerator {
     }
 }
 
-fn get_time_from_beats(beats: f32, tempo_changes: &ssq::TempoChanges) -> Option<beatmap::Time> {
+fn get_time_from_beats(beats: f32, tempo_changes: &ssq::TempoChanges) -> Option<Time> {
     for tempo_change in tempo_changes.to_vec() {
         // For TempoChanges that are infinitely short but exactly cover that beat, use the start
         // time of that TempoChange
@@ -175,7 +176,7 @@ impl From<ssq::TempoChange> for beatmap::TimingPoint {
                 tempo_change.beat_length
             },
             meter: 4,
-            sample_set: beatmap::SampleSet::BeatmapDefault,
+            sample_set: SampleSet::BeatmapDefault,
             sample_index: 0,
             volume: 100,
             uninherited: true,
@@ -206,26 +207,15 @@ impl ssq::Step {
 
                         for (column, active) in columns.iter().enumerate() {
                             if *active {
-                                hit_objects.push(beatmap::HitObject::HitCircle {
-                                    x: beatmap::column_to_x(column as u8, num_columns),
-                                    y: 192,
-                                    time,
-                                    hit_sound: beatmap::HitSound {
-                                        normal: true,
-                                        whistle: false,
-                                        finish: false,
-                                        clap: false,
-                                    },
-                                    new_combo: false,
-                                    skip_combo_colours: 0,
-                                    hit_sample: beatmap::HitSample {
-                                        normal_set: 0,
-                                        addition_set: 0,
-                                        index: 0,
-                                        volume: 0,
-                                        filename: "".to_string(),
-                                    },
-                                })
+                                hit_objects.push(
+                                    beatmap::hit_object::ManiaHitCircleBuilder::default()
+                                        .column(column as u8)
+                                        .columns(num_columns)
+                                        .time(time)
+                                        .build()
+                                        .unwrap()
+                                        .into(),
+                                )
                             }
                         }
                     }
@@ -245,27 +235,16 @@ impl ssq::Step {
 
                         for (column, active) in columns.iter().enumerate() {
                             if *active {
-                                hit_objects.push(beatmap::HitObject::Hold {
-                                    column: column as u8,
-                                    columns: num_columns,
-                                    time,
-                                    end_time,
-                                    hit_sound: beatmap::HitSound {
-                                        normal: true,
-                                        whistle: false,
-                                        finish: false,
-                                        clap: false,
-                                    },
-                                    new_combo: false,
-                                    skip_combo_colours: 0,
-                                    hit_sample: beatmap::HitSample {
-                                        normal_set: 0,
-                                        addition_set: 0,
-                                        index: 0,
-                                        volume: 0,
-                                        filename: "".to_string(),
-                                    },
-                                })
+                                hit_objects.push(
+                                    beatmap::hit_object::HoldBuilder::default()
+                                        .column(column as u8)
+                                        .columns(num_columns)
+                                        .time(time)
+                                        .end_time(end_time)
+                                        .build()
+                                        .unwrap()
+                                        .into(),
+                                )
                             }
                         }
                     }
@@ -287,26 +266,15 @@ impl ssq::Step {
                 let columns = shock_step_generator.next().unwrap_or_else(Vec::new);
 
                 for column in columns {
-                    hit_objects.push(beatmap::HitObject::HitCircle {
-                        x: beatmap::column_to_x(column as u8, num_columns),
-                        y: 192,
-                        time: get_time_from_beats(*beats, tempo_changes)?,
-                        hit_sound: beatmap::HitSound {
-                            normal: true,
-                            whistle: false,
-                            finish: false,
-                            clap: false,
-                        },
-                        new_combo: false,
-                        skip_combo_colours: 0,
-                        hit_sample: beatmap::HitSample {
-                            normal_set: 0,
-                            addition_set: 0,
-                            index: 0,
-                            volume: 0,
-                            filename: "".to_string(),
-                        },
-                    })
+                    hit_objects.push(
+                        beatmap::hit_object::ManiaHitCircleBuilder::default()
+                            .column(column as u8)
+                            .columns(num_columns)
+                            .time(get_time_from_beats(*beats, tempo_changes)?)
+                            .build()
+                            .unwrap()
+                            .into(),
+                    )
                 }
             }
         }
@@ -323,54 +291,60 @@ struct ConvertedChart {
 
 impl ConvertedChart {
     fn to_beatmap(&self, config: &Config) -> beatmap::Beatmap {
-        beatmap::Beatmap {
-            version: 14,
-            general: beatmap::General {
-                audio_filename: config.audio_filename.clone(),
-                audio_lead_in: 0,
-                preview_time: 0,
-                countdown: beatmap::Countdown::No,
-                sample_set: beatmap::SampleSet::Soft,
-                mode: beatmap::Mode::Mania,
-            },
-            editor: beatmap::Editor {},
-            metadata: beatmap::Metadata {
-                title: config
-                    .metadata
-                    .title
-                    .as_ref()
-                    .unwrap_or(&"unknown title".to_string())
-                    .clone(),
-                artist: config
-                    .metadata
-                    .artist
-                    .as_ref()
-                    .unwrap_or(&"unknown artist".to_string())
-                    .clone(),
-                creator: format!("{}", config),
-                version: match &config.metadata.levels {
-                    Some(levels) => {
-                        let level = self.level.to_value(levels);
-                        format!("{} (Lv. {})", self.level, level)
-                    }
-                    None => format!("{}", self.level),
-                },
-                source: config.metadata.source.clone(),
-                tags: vec![],
-            },
-            difficulty: beatmap::Difficulty {
-                hp_drain_rate: config.hp_drain.map_from(self.level.relative_difficulty()),
-                circle_size: f32::from(self.level.players) * 4.0,
-                overall_difficulty: config.accuracy.map_from(self.level.relative_difficulty()),
-                approach_rate: 8.0,
-                slider_multiplier: 0.64,
-                slider_tick_rate: 1.0,
-            },
-            events: beatmap::Events(vec![]),
-            timing_points: self.timing_points.clone(),
-            colours: beatmap::Colours(vec![]),
-            hit_objects: self.hit_objects.clone(),
-        }
+        beatmap::BeatmapBuilder::default()
+            .general(
+                beatmap::GeneralBuilder::default()
+                    .audio_filename(config.audio_filename.clone())
+                    .sample_set(SampleSet::Soft)
+                    .mode(Mode::Mania)
+                    .build()
+                    .unwrap(),
+            )
+            .metadata(
+                beatmap::MetadataBuilder::default()
+                    .title(
+                        config
+                            .metadata
+                            .title
+                            .as_ref()
+                            .unwrap_or(&"unknown title".to_string())
+                            .clone(),
+                    )
+                    .artist(
+                        config
+                            .metadata
+                            .artist
+                            .as_ref()
+                            .unwrap_or(&"unknown artist".to_string())
+                            .clone(),
+                    )
+                    .creator(format!("{}", config))
+                    .version(match &config.metadata.levels {
+                        Some(levels) => {
+                            let level = self.level.to_value(levels);
+                            format!("{} (Lv. {})", self.level, level)
+                        }
+                        None => format!("{}", self.level),
+                    })
+                    .source(config.metadata.source.clone())
+                    .build()
+                    .unwrap(),
+            )
+            .difficulty(
+                beatmap::DifficultyBuilder::default()
+                    .hp_drain_rate(config.hp_drain.map_from(self.level.relative_difficulty()))
+                    .circle_size(f32::from(self.level.players) * 4.0)
+                    .overall_difficulty(config.accuracy.map_from(self.level.relative_difficulty()))
+                    .approach_rate(8.0)
+                    .slider_multiplier(0.64)
+                    .slider_tick_rate(1.0)
+                    .build()
+                    .unwrap(),
+            )
+            .timing_points(self.timing_points.clone())
+            .hit_objects(self.hit_objects.clone())
+            .build()
+            .unwrap()
     }
 }
 
