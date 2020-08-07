@@ -219,37 +219,34 @@ fn ddr2osu(
         .with_context(|| format!("failed to read XWB file {}", &xwb_file.clone().display()))?;
     let wave_bank = WaveBank::parse(&xwb_data).context("failed to parse XWB file")?;
 
-    let audio_data = if wave_bank.sounds.contains_key(&basename) {
-        wave_bank
-            .sounds
-            .get(&basename)
-            .unwrap()
-            .to_wav()
-            .with_context(|| {
-                format!(
-                    "failed to convert wave bank sound entry “{}” to WAV",
-                    basename
-                )
-            })?
-    } else if wave_bank.sounds.len() == 2 {
-        warn!(
-            "Sound {} not found in wave bank, but it has two entries; assuming these are preview and full song",
-            basename
-        );
-        let mut sounds = wave_bank.sounds.values().collect::<Vec<&XWBSound>>();
-        sounds.sort_unstable_by(|a, b| b.size.cmp(&a.size));
-        sounds[0].to_wav().with_context(|| {
+    let audio_data = wave_bank.sounds.get(&basename)
+        .map(|sound| sound.to_wav().with_context(|| {
             format!(
                 "failed to convert wave bank sound entry “{}” to WAV",
                 basename
             )
-        })?
-    } else {
-        return Err(anyhow!(
-            "Could not find matching sound in wave bank (searched for {})",
-            basename,
-        ));
-    };
+        }))
+        .unwrap_or_else(|| {
+            if wave_bank.sounds.len() == 2 {
+                warn!(
+                    "Sound {} not found in wave bank, but it has two entries; assuming these are preview and full song",
+                    basename
+                );
+                let mut sounds = wave_bank.sounds.values().collect::<Vec<&XWBSound>>();
+                sounds.sort_unstable_by(|a, b| b.size.cmp(&a.size));
+                sounds[0].to_wav().with_context(|| {
+                    format!(
+                        "failed to convert wave bank sound entry “{}” to WAV",
+                        basename
+                    )
+                })
+            } else {
+                Err(anyhow!(
+                    "Could not find matching sound in wave bank (searched for {})",
+                    basename,
+                ))
+            }
+        })?;
 
     let osz = osu::osz::Archive {
         beatmaps,
