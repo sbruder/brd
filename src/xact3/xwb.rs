@@ -11,7 +11,7 @@ use num_traits::FromPrimitive;
 use thiserror::Error;
 
 use crate::mini_parser;
-use crate::mini_parser::{MiniParser, MiniParserError};
+use crate::mini_parser::MiniParser;
 use crate::xact3::adpcm;
 
 #[derive(Error, Debug)]
@@ -23,7 +23,7 @@ pub enum Error {
     #[error(transparent)]
     IOError(#[from] io::Error),
     #[error(transparent)]
-    MiniParserError(#[from] MiniParserError),
+    MiniParserError(#[from] crate::mini_parser::Error),
     #[error(transparent)]
     ADPCMError(#[from] adpcm::Error),
     #[error(transparent)]
@@ -82,8 +82,11 @@ struct SegmentPosition {
 }
 
 impl SegmentPosition {
-    fn get_from<'a>(&self, data: &'a [u8]) -> Result<&'a [u8], MiniParserError> {
-        mini_parser::get_slice_range(data, self.offset..self.offset + self.length)
+    fn get_from<'a>(&self, data: &'a [u8]) -> Result<&'a [u8], Error> {
+        Ok(mini_parser::get_slice_range(
+            data,
+            self.offset..self.offset + self.length,
+        )?)
     }
 }
 

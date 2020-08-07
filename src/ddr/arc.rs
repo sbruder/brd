@@ -28,7 +28,7 @@ pub enum Error {
     #[error(transparent)]
     TryFromIntError(#[from] num::TryFromIntError),
     #[error(transparent)]
-    MiniParserError(#[from] mini_parser::MiniParserError),
+    MiniParserError(#[from] mini_parser::Error),
 }
 
 type Result<T> = std::result::Result<T, Error>;

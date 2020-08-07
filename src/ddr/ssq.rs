@@ -11,7 +11,7 @@ use derive_more::Deref;
 use log::{debug, info, trace, warn};
 use thiserror::Error;
 
-use crate::mini_parser::{MiniParser, MiniParserError};
+use crate::mini_parser::MiniParser;
 use crate::utils;
 
 const MEASURE_LENGTH: f32 = 4096.0;
@@ -29,7 +29,7 @@ pub enum Error {
     #[error(transparent)]
     TryFromIntError(#[from] num::TryFromIntError),
     #[error(transparent)]
-    MiniParserError(#[from] MiniParserError),
+    MiniParserError(#[from] crate::mini_parser::Error),
 }
 
 /// Convert time offset to beats

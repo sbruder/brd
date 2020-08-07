@@ -7,7 +7,7 @@ use std::ops::Range;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum MiniParserError {
+pub enum Error {
     #[error(transparent)]
     TryFromIntError(#[from] num::TryFromIntError),
     #[error(transparent)]
@@ -20,7 +20,7 @@ pub enum MiniParserError {
 pub trait MiniParser: io::Read {
     /// Read a `String` of length `length` and strip NUL bytes.
     #[inline]
-    fn read_string(&mut self, length: usize) -> Result<String, MiniParserError> {
+    fn read_string(&mut self, length: usize) -> Result<String, Error> {
         let mut buf = String::new();
         self.take(length.try_into()?).read_to_string(&mut buf)?;
         Ok(buf.replace("\0", ""))
@@ -28,7 +28,7 @@ pub trait MiniParser: io::Read {
 
     /// Read `n` `i32`.
     #[inline]
-    fn read_n_i32(&mut self, n: usize) -> Result<Vec<i32>, MiniParserError> {
+    fn read_n_i32(&mut self, n: usize) -> Result<Vec<i32>, Error> {
         let mut buf = vec![0; 4 * n];
         self.read_exact(&mut buf)?;
         Ok(buf
@@ -44,8 +44,8 @@ impl<R: io::Read + ?Sized> MiniParser for R {}
 
 /// Gets the requested `range` from `slice` and errors with `UnexpectedEof` when range does not fit
 /// in slice.
-pub fn get_slice_range(slice: &[u8], range: Range<usize>) -> Result<&[u8], MiniParserError> {
-    slice.get(range).ok_or(MiniParserError::UnexpectedEof)
+pub fn get_slice_range(slice: &[u8], range: Range<usize>) -> Result<&[u8], Error> {
+    slice.get(range).ok_or(Error::UnexpectedEof)
 }
 
 #[cfg(test)]
