@@ -2,6 +2,7 @@
 ignore-tests = true
 target-dir = "target/tarpaulin/"
 exclude-files = ["target/*"]
+run-types = ["Tests", "Doctests"]
 
 [report]
 out = ["Html"]
