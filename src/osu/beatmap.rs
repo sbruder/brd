@@ -129,7 +129,7 @@ pub struct General {
 }
 
 impl fmt::Display for General {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "\
@@ -155,7 +155,7 @@ impl fmt::Display for General {
 pub struct Editor;
 
 impl fmt::Display for Editor {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "[Editor]")
     }
 }
@@ -175,7 +175,7 @@ pub struct Metadata {
 }
 
 impl fmt::Display for Metadata {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "\
@@ -238,7 +238,7 @@ impl DifficultyBuilder {
 }
 
 impl fmt::Display for Difficulty {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "\
@@ -264,7 +264,7 @@ impl fmt::Display for Difficulty {
 pub struct Events(pub Vec<Event>);
 
 impl fmt::Display for Events {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "\
@@ -296,7 +296,7 @@ pub enum Event {
 }
 
 impl fmt::Display for Event {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Event::Background {
                 filename,
@@ -325,7 +325,7 @@ impl fmt::Display for Event {
 pub struct TimingPoints(pub Vec<TimingPoint>);
 
 impl fmt::Display for TimingPoints {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "\
@@ -344,7 +344,7 @@ pub struct TimingPointEffects {
 }
 
 impl fmt::Display for TimingPointEffects {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{}",
@@ -381,7 +381,7 @@ pub struct TimingPoint {
 }
 
 impl fmt::Display for TimingPoint {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{},{},{},{},{},{},{},{}",
@@ -401,7 +401,7 @@ impl fmt::Display for TimingPoint {
 pub struct Colours(pub Vec<Colour>);
 
 impl fmt::Display for Colours {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "\
@@ -421,7 +421,7 @@ pub enum ColourScope {
 }
 
 impl fmt::Display for ColourScope {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ColourScope::Combo(i) => write!(f, "Combo{}", i),
             _ => write!(f, "{:?}", self),
@@ -436,7 +436,7 @@ pub struct Colour {
 }
 
 impl fmt::Display for Colour {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{} : {}",
@@ -447,7 +447,7 @@ impl fmt::Display for Colour {
 }
 
 impl fmt::Display for HitSound {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{}",
@@ -466,7 +466,7 @@ impl fmt::Display for HitSound {
 }
 
 impl fmt::Display for HitSample {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{}:{}:{}:{}:{}",
@@ -483,7 +483,7 @@ impl fmt::Display for HitSample {
 pub struct HitObjects(pub Vec<HitObject>);
 
 impl fmt::Display for HitObjects {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "\
@@ -513,7 +513,7 @@ pub struct Beatmap {
 }
 
 impl fmt::Display for Beatmap {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "osu file format v{}\n\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}",

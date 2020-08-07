@@ -65,7 +65,7 @@ impl Into<Vec<bool>> for PlayerRow {
 }
 
 impl fmt::Display for PlayerRow {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{}{}{}{}",
@@ -98,7 +98,7 @@ impl Into<Vec<bool>> for Row {
 }
 
 impl fmt::Display for Row {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let player_rows = match self {
             Self::Single(player_row) => vec![player_row],
             Self::Double(player_row1, player_row2) => vec![player_row1, player_row2],
@@ -412,7 +412,7 @@ impl TryFrom<u16> for Level {
 }
 
 impl fmt::Display for Level {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let players = match self.players {
             1 => "Single",
             2 => "Double",

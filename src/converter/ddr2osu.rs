@@ -20,7 +20,7 @@ impl ConfigRange {
 }
 
 impl fmt::Display for ConfigRange {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.0, self.1)
     }
 }
@@ -89,7 +89,7 @@ pub struct ConfigMetadata {
 }
 
 impl fmt::Display for Config {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "ddr2osu ({}shock→{:?} hp{} acc{})",

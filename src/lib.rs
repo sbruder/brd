@@ -1,4 +1,5 @@
 #![warn(clippy::cast_lossless)]
+#![warn(rust_2018_idioms)]
 
 #[cfg(test)]
 #[macro_use(quickcheck)]

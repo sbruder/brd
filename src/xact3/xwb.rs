@@ -193,7 +193,7 @@ pub struct WaveBank<'a> {
 }
 
 impl WaveBank<'_> {
-    pub fn parse(data: &'_ [u8]) -> Result<WaveBank, Error> {
+    pub fn parse(data: &'_ [u8]) -> Result<WaveBank<'_>, Error> {
         debug!("Parsing header");
         let header = Header::parse(mini_parser::get_slice_range(data, 0..52)?)?;
 
