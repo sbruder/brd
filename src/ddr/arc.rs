@@ -19,9 +19,9 @@ const MAGIC: u32 = 0x19751120;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Invalid magic (expected {expected:#x}, found {found:#x})")]
+    #[error("invalid magic (expected {expected:#x}, found {found:#x})")]
     InvalidMagic { expected: u32, found: u32 },
-    #[error("Invalid size after decompresseion (expected {expected}, found {found})")]
+    #[error("invalid size after decompresseion (expected {expected}, found {found})")]
     DecompressionSize { expected: usize, found: usize },
     #[error(transparent)]
     IOError(#[from] io::Error),

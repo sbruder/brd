@@ -18,7 +18,7 @@ use crate::xact3::adpcm;
 pub enum Error {
     #[error("{0:?} is not a supported format")]
     UnsupportedFormat(FormatTag),
-    #[error("Invalid magic: expected “WBND”, found “{0}”")]
+    #[error("invalid magic (expected “WBND”, found “{0}”)")]
     InvalidMagic(String),
     #[error(transparent)]
     IOError(#[from] io::Error),

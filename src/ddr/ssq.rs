@@ -18,11 +18,11 @@ const MEASURE_LENGTH: f32 = 4096.0;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("Not enough freeze data was found")]
+    #[error("not enough freeze data was found")]
     NotEnoughFreezeData,
-    #[error("Invalid player count {0} (valid options: 1, 2)")]
+    #[error("invalid player count {0} (valid options: 1, 2)")]
     InvalidPlayerCount(u8),
-    #[error("Invalid difficulty {0} (valid options: 4, 1, 2, 3, 6)")]
+    #[error("invalid difficulty {0} (valid options: 4, 1, 2, 3, 6)")]
     InvalidDifficulty(u8),
     #[error(transparent)]
     IOError(#[from] io::Error),
