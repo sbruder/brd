@@ -1,13 +1,21 @@
 use std::fmt;
 use std::str::FromStr;
 
-use anyhow::{anyhow, Result};
 use clap::Clap;
 use log::{debug, info, trace, warn};
+use thiserror::Error;
 
 use crate::ddr::ssq;
 use crate::osu::beatmap;
 use crate::osu::types::*;
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("invalid range format (expected “start:end”, found {0})")]
+    InvalidRangeFormat(String),
+    #[error(transparent)]
+    InvalidFloat(#[from] std::num::ParseFloatError),
+}
 
 #[derive(Clone, Debug)]
 pub struct ConfigRange(f32, f32);
@@ -26,12 +34,12 @@ impl fmt::Display for ConfigRange {
 }
 
 impl FromStr for ConfigRange {
-    type Err = anyhow::Error;
+    type Err = Error;
 
-    fn from_str(string: &str) -> Result<Self> {
+    fn from_str(string: &str) -> Result<Self, Error> {
         match string.split(':').collect::<Vec<&str>>()[..] {
             [start, end] => Ok(ConfigRange(start.parse::<f32>()?, end.parse::<f32>()?)),
-            _ => Err(anyhow!("Invalid range format (expected start:end)")),
+            _ => Err(Error::InvalidRangeFormat(string.to_string())),
         }
     }
 }
@@ -349,7 +357,7 @@ impl ConvertedChart {
 }
 
 impl ssq::SSQ {
-    pub fn to_beatmaps(&self, config: &Config) -> Result<Vec<beatmap::Beatmap>> {
+    pub fn to_beatmaps(&self, config: &Config) -> Result<Vec<beatmap::Beatmap>, Error> {
         debug!("Configuration: {:?}", config);
 
         let mut timing_points = beatmap::TimingPoints(Vec::new());
