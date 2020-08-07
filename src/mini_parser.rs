@@ -12,6 +12,8 @@ pub enum MiniParserError {
     TryFromIntError(#[from] num::TryFromIntError),
     #[error(transparent)]
     IOError(#[from] io::Error),
+    #[error("file ended while there was data left to process")]
+    UnexpectedEof,
 }
 
 /// Provides convenience methods for parsing binary formats.
@@ -43,13 +45,7 @@ impl<R: io::Read + ?Sized> MiniParser for R {}
 /// Gets the requested `range` from `slice` and errors with `UnexpectedEof` when range does not fit
 /// in slice.
 pub fn get_slice_range(slice: &[u8], range: Range<usize>) -> Result<&[u8], MiniParserError> {
-    slice.get(range).ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::UnexpectedEof,
-            "File ended while there was data left to process",
-        )
-        .into()
-    })
+    slice.get(range).ok_or(MiniParserError::UnexpectedEof)
 }
 
 #[cfg(test)]
